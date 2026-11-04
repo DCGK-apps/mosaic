@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { defineConfig, type Plugin } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
 function listFiles(dir: string): string[] {
@@ -26,7 +28,7 @@ function serviceWorker(): Plugin {
     closeBundle() {
       const files = listFiles(outDir)
         .filter((f) => !f.endsWith('sw.js'))
-        .sort();
+        .toSorted();
       const hash = createHash('sha256');
       for (const f of files) hash.update(relative(outDir, f)).update(readFileSync(f));
       const version = hash.digest('hex').slice(0, 12);
@@ -43,7 +45,7 @@ function serviceWorker(): Plugin {
 // icons and the service worker for installing the app on a phone).
 export default defineConfig({
   base: './',
-  plugins: [viteSingleFile(), serviceWorker()],
+  plugins: [react(), tailwindcss(), viteSingleFile(), serviceWorker()],
   test: {
     include: ['tests/unit/**/*.test.ts'],
     environment: 'node',
