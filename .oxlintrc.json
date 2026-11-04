@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "unicorn",
+    "oxc",
+    "import"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/jsx-key": "error",
+    "react/button-has-type": "error",
+    "react/react-in-jsx-scope": "off",
+    "no-console": "warn",
+    "eqeqeq": "error",
+    "import/no-cycle": "error",
+    "unicorn/prefer-add-event-listener": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/require-post-message-target-origin": "off",
+    "no-underscore-dangle": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": [
+          "**/*.css", "fake-indexeddb/auto"
+        ]
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "test-results",
+    "playwright-report"
+  ]
+}

@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Mosaic",
+  "description": "Mosaic – kreator kolaży zdjęć do druku (układy automatyczne, kadrowanie, eksport JPG/PNG, PWA)",
   "homepage": "https://dcgk-apps.github.io/mosaic/",
   "repository": {
     "type": "git",
@@ -21,11 +21,22 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:slow": "SLOW_RAF=60 playwright test",
-    "test:all": "npm run typecheck && npm run test && npm run test:e2e"
+    "test:all": "npm run typecheck && npm run lint && npm run test && npm run test:e2e",
+    "lint": "oxlint --deny-warnings"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.4",
     "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "fake-indexeddb": "^6.2.7",
+    "lucide-react": "^1.68.0",
+    "oxlint": "^1.91.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.4",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vite-plugin-singlefile": "^2.3.4",

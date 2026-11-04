@@ -1,47 +1,133 @@
-:root {
-  --bg-app: #080c14;
-  --bg-panel: #111827;
-  --border: #26334d;
-  --accent: #4f46e5;
-  --text: #f1f5f9;
-  --muted: #94a3b8;
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #000080;
 }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html,
 body {
-  background: var(--bg-app); color: var(--text);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  height: 100%;
+  overscroll-behavior: none;
+}
+body {
   -webkit-tap-highlight-color: transparent;
 }
-#app { min-height: 100%; display: grid; place-items: center; padding: 16px; }
-h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.02em; }
 
-.btn { border: 0; border-radius: 9px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: #fff; }
-.btn-primary { background: var(--accent); }
-.btn-dark { background: #1f2937; }
-.icon-btn { border: 0; background: transparent; color: var(--muted); font-size: 16px; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
-.icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.icon.inline { width: 14px; height: 14px; vertical-align: -2px; }
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300);
+  border-radius: 3px;
+}
 
-#toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-120px); background: #1e293b; border: 1px solid #3b82f6; color: #f8fafc; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 99px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6); transition: transform 0.22s ease; z-index: 120; pointer-events: none; white-space: nowrap; }
-#toast.show { transform: translateX(-50%) translateY(0); }
+/* ---------------------------------------------------------- toast */
+#toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-120px);
+  background: var(--color-slate-900);
+  color: #fff;
+  font: 600 12px/1.2 var(--font-sans);
+  padding: 8px 16px;
+  border-radius: 99px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.3);
+  transition: transform 0.22s ease;
+  z-index: 120;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#toast.show {
+  transform: translateX(-50%) translateY(0);
+}
 
 /* ---------------------------------------------------------- install / update banners */
 .app-banner {
-  position: fixed; left: 50%; transform: translateX(-50%); z-index: 90;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  width: min(480px, calc(100% - 16px)); display: flex; align-items: center; gap: 10px;
-  background: var(--bg-panel); border: 1px solid var(--accent); border-radius: 14px; padding: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  width: min(480px, calc(100% - 16px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--color-brand);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.2);
+  font-family: var(--font-sans);
 }
-.app-banner[hidden] { display: none; }
-.app-banner img { border-radius: 9px; flex-shrink: 0; }
-.app-banner-text { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); line-height: 1.35; min-width: 0; }
-.app-banner-text strong { color: var(--text); font-size: 13px; }
-#install-banner:not([data-mode='prompt']) .only-prompt, #install-banner:not([data-mode='ios']) .only-ios { display: none; }
-#update-banner { border-color: #10b981; z-index: 91; }
+.app-banner[hidden] {
+  display: none;
+}
+.app-banner img {
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+.app-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--color-slate-500);
+  line-height: 1.35;
+  min-width: 0;
+}
+.app-banner-text strong {
+  color: var(--color-slate-900);
+  font-size: 13px;
+}
+.app-banner .btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: 600 13px/1 var(--font-sans);
+  cursor: pointer;
+}
+.app-banner .btn-primary {
+  background: var(--color-brand);
+  color: #fff;
+}
+.app-banner .btn-dark {
+  background: var(--color-slate-200);
+  color: var(--color-slate-700);
+}
+.app-banner .icon-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-slate-400);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.app-banner .icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+#install-banner:not([data-mode='prompt']) .only-prompt,
+#install-banner:not([data-mode='ios']) .only-ios {
+  display: none;
+}
+#update-banner {
+  border-color: var(--color-emerald-500);
+  z-index: 91;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

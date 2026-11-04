@@ -57,7 +57,7 @@ test('works offline after the first visit', async ({ page, context }) => {
   await context.setOffline(true);
   await page.reload();
   await expect(page.locator('body[data-ready="true"]')).toBeAttached();
-  await expect(page.locator('h1')).toHaveText('Mosaic');
+  await expect(page.getByTestId('empty')).toBeVisible();
   await context.setOffline(false);
 });
 
