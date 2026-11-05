@@ -1,6 +1,7 @@
 import { drawMosaic, exportFileName, exportSize, MAX_PIXELS, MAX_PIXELS_IOS, type ExportType } from './core/export';
 import { currentTree } from './core/doc';
 import type { Doc } from './core/types';
+import { download } from './download';
 import { loadImage } from './images';
 import { isIos } from './pwa';
 
@@ -26,12 +27,5 @@ export async function exportMosaic(doc: Doc, urlOf: (photoId: string) => string 
   drawMosaic(ctx, { tree: currentTree(doc), sheet: doc.sheet, photos: doc.photos }, images, size.pxPerMm);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, `image/${type}`, 0.95));
   if (!blob) throw new Error('Nie udało się zapisać obrazu');
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = exportFileName(doc.sheet, type);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  download(blob, exportFileName(doc.sheet, type));
 }

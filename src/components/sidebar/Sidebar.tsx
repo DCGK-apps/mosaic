@@ -5,6 +5,7 @@ import { ExportSection } from './ExportSection';
 import { LayoutSection } from './LayoutSection';
 import { MagazineSection } from './MagazineSection';
 import { PhotosSection } from './PhotosSection';
+import { ProjectSection } from './ProjectSection';
 import { SizeSection } from './SizeSection';
 import { StyleSection } from './StyleSection';
 import { Separator } from './ui';
@@ -20,6 +21,8 @@ export interface SidebarProps {
   onDpi: (dpi: number) => void;
   onExportType: (type: ExportType) => void;
   onExport: () => void;
+  onSaveProject: () => void;
+  onOpenProject: () => void;
   /** Mobile only: closes the drawer. */
   onClose?: () => void;
 }
@@ -106,6 +109,10 @@ export function Sidebar(props: SidebarProps) {
           onType={props.onExportType}
           onExport={props.onExport}
         />
+
+        <Separator />
+
+        <ProjectSection empty={doc.photos.length === 0 && doc.magazine.length === 0} onSave={props.onSaveProject} onOpen={props.onOpenProject} />
       </div>
     </>
   );

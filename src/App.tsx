@@ -8,6 +8,7 @@ import { exportMosaic } from './exporter';
 import { DESKTOP, useMediaQuery } from './hooks/useMediaQuery';
 import { useMosaic } from './hooks/useMosaic';
 import { useUndoShortcuts } from './hooks/useShortcuts';
+import { isProjectFile, ProjectError } from './storage/project';
 import { loadPref, savePref } from './prefs';
 import { toast } from './toast';
 
@@ -25,6 +26,7 @@ export function App() {
   const [exportType, setExportType] = useState<ExportType>(() => (loadPref<string>('exportType', 'jpeg') === 'png' ? 'png' : 'jpeg'));
   const [exporting, setExporting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const projectInput = useRef<HTMLInputElement>(null);
 
   useUndoShortcuts(mosaic.undo, mosaic.redo);
 
@@ -32,14 +34,29 @@ export function App() {
     if (mosaic.ready) document.body.dataset.ready = 'true';
   }, [mosaic.ready]);
 
-  const { addFiles } = mosaic;
+  const { addFiles, openProject } = mosaic;
+  const onOpenProject = useCallback(
+    async (file: File) => {
+      try {
+        await openProject(file);
+        toast('Otwarto projekt');
+      } catch (e) {
+        toast(e instanceof ProjectError ? e.message : 'Nie udało się otworzyć projektu');
+      }
+    },
+    [openProject],
+  );
+
   const onFiles = useCallback(
     async (files: File[]) => {
+      // A project file dropped on the canvas opens it.
+      const project = files.find(isProjectFile);
+      if (project) return onOpenProject(project);
       const n = await addFiles(files);
       if (n > 0) toast(`Dodano ${n} ${plural(n)}`);
       else if (files.length > 0) toast('Nie udało się wczytać zdjęć');
     },
-    [addFiles],
+    [addFiles, onOpenProject],
   );
 
   const onExport = async () => {
@@ -100,6 +117,14 @@ export function App() {
             savePref('exportType', t);
           }}
           onExport={onExport}
+          onSaveProject={() => {
+            try {
+              mosaic.saveProject();
+            } catch {
+              toast('Nie udało się zapisać projektu');
+            }
+          }}
+          onOpenProject={() => projectInput.current?.click()}
           onClose={() => setDrawerOpen(false)}
         />
       </aside>
@@ -115,6 +140,19 @@ export function App() {
           const files = Array.from(e.target.files ?? []);
           e.target.value = '';
           void onFiles(files);
+        }}
+      />
+
+      {/* No `accept`: phones grey out files with an unknown extension like .mosaic. */}
+      <input
+        ref={projectInput}
+        type="file"
+        hidden
+        data-testid="project-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void onOpenProject(file);
         }}
       />
 
