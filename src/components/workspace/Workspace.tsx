@@ -21,7 +21,7 @@ export function Workspace({ mosaic, swapMode, onFiles }: Props) {
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden p-4 md:p-8"
+      className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-slate-100 p-4 md:p-8"
       data-testid="workspace"
       onDragEnter={(e) => {
         if (!hasFiles(e)) return;
