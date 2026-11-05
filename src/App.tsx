@@ -54,7 +54,7 @@ export function App() {
   };
 
   return (
-    <div className="flex h-dvh flex-col bg-[#fef08a] font-sans text-slate-900 md:flex-row">
+    <div className="flex h-dvh flex-col bg-[#f8f9fa] font-sans text-slate-900 md:flex-row">
       {/* Phone: top bar, settings in a drawer. */}
       <header className="flex items-center justify-between bg-brand px-3 py-2 text-white md:hidden">
         <span className="text-lg font-bold tracking-wide">Mosaic</span>
