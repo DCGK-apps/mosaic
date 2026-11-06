@@ -5,7 +5,9 @@ import { canRedo, canUndo, commit, createHistory, end, preview, redo, undo, type
 import { randomSeed } from '../core/random';
 import type { Doc, Photo } from '../core/types';
 import { isImageFile, readImage, type ImageEntry } from '../images';
+import { download } from '../download';
 import { MosaicDb } from '../storage/db';
+import { ProjectError, projectFileName, readProject, writeProject } from '../storage/project';
 import { restoreDoc, toSaved } from '../storage/serialize';
 
 type AppAction =
@@ -13,7 +15,9 @@ type AppAction =
   | { type: 'endGesture' }
   | { type: 'undo' }
   | { type: 'redo' }
-  | { type: 'load'; doc: Doc };
+  | { type: 'load'; doc: Doc }
+  /** An opened project – one undoable step, so Ctrl+Z brings the previous work back. */
+  | { type: 'open'; doc: Doc };
 
 function appReducer(h: History<Doc>, a: AppAction): History<Doc> {
   switch (a.type) {
@@ -29,6 +33,8 @@ function appReducer(h: History<Doc>, a: AppAction): History<Doc> {
       return redo(h);
     case 'load':
       return createHistory(a.doc);
+    case 'open':
+      return commit(h, a.doc);
   }
 }
 
@@ -83,6 +89,47 @@ export function useMosaic() {
     },
     [act],
   );
+
+  /** Saves an editable project file (.mosaic) with the document and the original photos. */
+  const saveProject = useCallback(() => {
+    const current = docRef.current;
+    download(writeProject(current, (id) => images.current.get(id)?.blob), projectFileName(current));
+  }, []);
+
+  /** Opens a project file in place of the current work. Throws ProjectError with a message for the user. */
+  const openProject = useCallback(async (file: Blob): Promise<void> => {
+    const { saved, images: blobs } = await readProject(file);
+    const opened = new Map<string, ImageEntry>();
+    for (const [id, blob] of blobs) {
+      const known = images.current.get(id);
+      if (known && known.blob.size === blob.size) {
+        opened.set(id, known);
+        continue;
+      }
+      try {
+        const { url } = await readImage(blob);
+        opened.set(id, { blob, url });
+      } catch {
+        /* a damaged photo – left out, restoreDoc closes its gap */
+      }
+    }
+    const restored = restoreDoc(saved, (id) => opened.has(id));
+    if (!restored) {
+      for (const [id, entry] of opened) if (images.current.get(id) !== entry) URL.revokeObjectURL(entry.url);
+      throw new ProjectError('Ten plik projektu pochodzi z nowszej wersji programu albo jest uszkodzony');
+    }
+    for (const [id, entry] of opened) {
+      const old = images.current.get(id);
+      if (old === entry) continue;
+      // Same id, different file (practically impossible – ids are random): the opened one wins.
+      if (old) {
+        URL.revokeObjectURL(old.url);
+        stored.current.delete(id);
+      }
+      images.current.set(id, entry);
+    }
+    dispatch({ type: 'open', doc: restored });
+  }, []);
 
   const urlOf = useCallback((photoId: string) => images.current.get(photoId)?.url, []);
 
@@ -165,9 +212,11 @@ export function useMosaic() {
       canUndo: canUndo(history),
       canRedo: canRedo(history),
       addFiles,
+      saveProject,
+      openProject,
       urlOf,
     }),
-    [doc, ready, act, endGesture, undoFn, redoFn, history, addFiles, urlOf],
+    [doc, ready, act, endGesture, undoFn, redoFn, history, addFiles, saveProject, openProject, urlOf],
   );
 }
 

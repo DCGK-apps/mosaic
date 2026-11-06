@@ -12,6 +12,7 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 - **Magazyn odłożonych** zdjęć: odłóż, przywróć, usuń trwale.
 - **Wymiary:** gotowe formaty (A4, A3, 30 × 40 cm…) lub własne, obrót pion/poziom; ramka i zaokrąglenie w milimetrach wydruku.
 - **Eksport** do JPG/PNG w 100/150/300 DPI. Plik wygląda dokładnie jak podgląd (ta sama geometria).
+- **Projekt do dalszej edycji:** „Zapisz projekt” tworzy plik `.mosaic` (oryginalne zdjęcia, układ, kadry, ustawienia arkusza i magazyn). „Otwórz projekt” – albo przeciągnięcie pliku `.mosaic` na płótno – przywraca kolaż do edycji, także na innym urządzeniu; otwarcie można cofnąć.
 - **Cofnij / Ponów** (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y).
 - **Automatyczny zapis** w przeglądarce (IndexedDB): zdjęcia, układ i kadry wracają po odświeżeniu.
 - **Dodawanie zdjęć** przyciskiem lub przeciągnięciem plików na płótno.
@@ -53,7 +54,7 @@ src/
     history.ts   cofnij/ponów, przeciąganie = jeden krok
     export.ts    rysowanie na canvasie, rozdzielczość, limity przeglądarek
     formats.ts   formaty papieru
-  storage/     zapis w IndexedDB i bezpieczne odtwarzanie danych
+  storage/     zapis w IndexedDB, plik projektu .mosaic i bezpieczne odtwarzanie danych
   hooks/       useMosaic (stan + historia + autozapis), skróty, rozmiar elementu
   components/
     sidebar/     panel boczny – każda sekcja osobno
