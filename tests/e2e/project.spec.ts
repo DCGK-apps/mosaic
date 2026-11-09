@@ -150,3 +150,13 @@ test('new project is off while there is nothing to lose', async ({ page }) => {
   await openApp(page);
   await inPanel(page, () => expect(page.getByTestId('project-new')).toBeDisabled());
 });
+
+test('on a computer "Nowy projekt" is also at the top of the panel', async ({ page }, info) => {
+  test.skip(!!info.project.use.isMobile, 'computer layout');
+  await openApp(page);
+  await expect(page.getByTestId('header-new')).toBeDisabled();
+  await addPhotos(page, ['square']);
+  await page.getByTestId('header-new').click();
+  await page.getByTestId('new-save-no').click();
+  await expect(cells(page)).toHaveCount(0);
+});

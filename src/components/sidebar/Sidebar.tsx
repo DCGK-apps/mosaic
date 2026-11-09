@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Images, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { FilePlus, Image as ImageIcon, Images, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { cx } from '../cx';
 import type { ExportType } from '../../core/export';
 import type { Mosaic } from '../../hooks/useMosaic';
@@ -65,6 +65,16 @@ export function Sidebar(props: SidebarProps) {
         <div className="absolute left-3 top-3 hidden md:block">
           <UndoRedo mosaic={mosaic} dark />
         </div>
+        <button
+          type="button"
+          onClick={props.onNewProject}
+          disabled={doc.photos.length === 0 && doc.magazine.length === 0}
+          className="absolute right-3 top-3 hidden items-center gap-1 rounded p-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent md:flex"
+          title="Nowy projekt"
+          data-testid="header-new"
+        >
+          <FilePlus className="h-5 w-5" /> Nowy
+        </button>
         {onClose && (
           <button type="button" onClick={onClose} className="absolute right-3 top-3 rounded p-1.5 text-white/80 hover:bg-white/10 md:hidden" aria-label="Zamknij panel" data-testid="drawer-close">
             <X className="h-5 w-5" />
