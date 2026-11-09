@@ -1,4 +1,5 @@
-import { Image as ImageIcon, Redo2, Undo2, X } from 'lucide-react';
+import { Image as ImageIcon, Images, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { cx } from '../cx';
 import type { ExportType } from '../../core/export';
 import type { Mosaic } from '../../hooks/useMosaic';
 import { ExportSection } from './ExportSection';
@@ -9,6 +10,9 @@ import { ProjectSection } from './ProjectSection';
 import { SizeSection } from './SizeSection';
 import { StyleSection } from './StyleSection';
 import { Separator } from './ui';
+
+/** On a phone the panel shows one tab at a time; on a computer everything is visible. */
+export type PanelTab = 'photos' | 'options';
 
 export interface SidebarProps {
   mosaic: Mosaic;
@@ -23,6 +27,9 @@ export interface SidebarProps {
   onExport: () => void;
   onSaveProject: () => void;
   onOpenProject: () => void;
+  onNewProject: () => void;
+  tab: PanelTab;
+  onTab: (tab: PanelTab) => void;
   /** Mobile only: closes the drawer. */
   onClose?: () => void;
 }
@@ -44,7 +51,7 @@ export function UndoRedo({ mosaic, dark }: { mosaic: Mosaic; dark?: boolean }) {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { mosaic, swapMode, onSwapMode, onAddPhotos, onClose } = props;
+  const { mosaic, swapMode, onSwapMode, onAddPhotos, onClose, tab, onTab } = props;
   const { doc, act, endGesture, urlOf } = mosaic;
   const hasPhotos = doc.photos.length > 0;
 
@@ -59,13 +66,39 @@ export function Sidebar(props: SidebarProps) {
           <UndoRedo mosaic={mosaic} dark />
         </div>
         {onClose && (
-          <button type="button" onClick={onClose} className="absolute right-3 top-3 rounded p-1.5 text-white/80 hover:bg-white/10 md:hidden" aria-label="Zamknij ustawienia" data-testid="drawer-close">
+          <button type="button" onClick={onClose} className="absolute right-3 top-3 rounded p-1.5 text-white/80 hover:bg-white/10 md:hidden" aria-label="Zamknij panel" data-testid="drawer-close">
             <X className="h-5 w-5" />
           </button>
         )}
       </div>
 
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex border-b border-slate-200 md:hidden" role="tablist" aria-label="Panel">
+        {(
+          [
+            ['photos', Images, 'Zdjęcia'],
+            ['options', SlidersHorizontal, 'Opcje'],
+          ] as const
+        ).map(([id, Icon, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => onTab(id)}
+            data-testid={`tab-${id}`}
+            className={cx(
+              'flex flex-1 items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-bold transition-colors',
+              tab === id ? 'border-brand text-brand' : 'border-transparent text-slate-500',
+            )}
+          >
+            <Icon className="h-4 w-4" /> {label}
+            {id === 'photos' && doc.photos.length > 0 && <span className="text-xs font-medium opacity-70">({doc.photos.length})</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Photos tab */}
+      <div className={cx('p-6 md:pb-0', tab !== 'photos' && 'max-md:hidden')} role="tabpanel" data-testid="panel-photos">
         <div>
           <PhotosSection photos={doc.photos} urlOf={urlOf} onAdd={onAddPhotos} onRemove={(photoId) => act({ type: 'toMagazine', photoId })} />
           <MagazineSection
@@ -75,8 +108,13 @@ export function Sidebar(props: SidebarProps) {
             onDelete={(photoId) => act({ type: 'deleteFromMagazine', photoId })}
           />
         </div>
+      </div>
 
-        <Separator />
+      {/* Options tab */}
+      <div className={cx('flex flex-col gap-6 p-6', tab !== 'options' && 'max-md:hidden')} role="tabpanel" data-testid="panel-options">
+        <div className="hidden md:block">
+          <Separator />
+        </div>
 
         {hasPhotos && (
           <>
@@ -112,7 +150,7 @@ export function Sidebar(props: SidebarProps) {
 
         <Separator />
 
-        <ProjectSection empty={doc.photos.length === 0 && doc.magazine.length === 0} onSave={props.onSaveProject} onOpen={props.onOpenProject} />
+        <ProjectSection empty={doc.photos.length === 0 && doc.magazine.length === 0} onSave={props.onSaveProject} onOpen={props.onOpenProject} onNew={props.onNewProject} />
       </div>
     </>
   );

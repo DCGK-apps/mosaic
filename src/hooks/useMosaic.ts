@@ -131,6 +131,11 @@ export function useMosaic() {
     dispatch({ type: 'open', doc: restored });
   }, []);
 
+  /** Starts over with an empty sheet (same format and style) – one undoable step. */
+  const newProject = useCallback(() => {
+    dispatch({ type: 'open', doc: { ...emptyDoc(), sheet: { ...docRef.current.sheet } } });
+  }, []);
+
   const urlOf = useCallback((photoId: string) => images.current.get(photoId)?.url, []);
 
   // Restore the saved work once.
@@ -214,9 +219,10 @@ export function useMosaic() {
       addFiles,
       saveProject,
       openProject,
+      newProject,
       urlOf,
     }),
-    [doc, ready, act, endGesture, undoFn, redoFn, history, addFiles, saveProject, openProject, urlOf],
+    [doc, ready, act, endGesture, undoFn, redoFn, history, addFiles, saveProject, openProject, newProject, urlOf],
   );
 }
 

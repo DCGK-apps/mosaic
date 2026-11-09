@@ -18,10 +18,8 @@ test('added photos fill the sheet, each one exactly once', async ({ page }) => {
   await expect(page.locator('#toast')).toHaveText('Dodano 5 zdjęć');
   const doc = await getDoc(page);
   expect((await shownPhotos(page)).toSorted()).toEqual(doc.photos.map((p: { id: string }) => p.id).toSorted());
-  await inPanel(page, async () => {
-    await expect(page.getByTestId('photo-thumb')).toHaveCount(5);
-    await expect(page.getByTestId('auto-position')).toHaveText('1 / 1');
-  });
+  await inPanel(page, () => expect(page.getByTestId('photo-thumb')).toHaveCount(5), 'photos');
+  await inPanel(page, () => expect(page.getByTestId('auto-position')).toHaveText('1 / 1'));
 });
 
 for (const mode of ['grid', 'central', 'rows', 'cols', 'auto']) {

@@ -78,7 +78,7 @@ test('magazine: put aside, bring back, delete for good', async ({ page }) => {
     await expect(page.getByTestId('magazine-item')).toHaveCount(1);
     await page.getByTestId('magazine-restore').click();
     await expect(page.getByTestId('magazine')).toHaveCount(0);
-  });
+  }, 'photos');
   await expect(cells(page)).toHaveCount(3);
   expect(await shownPhotos(page)).toContain(id);
   await inPanel(page, async () => {
@@ -86,7 +86,7 @@ test('magazine: put aside, bring back, delete for good', async ({ page }) => {
     await page.getByTestId('magazine-delete').click();
     await expect(page.getByTestId('magazine')).toHaveCount(0);
     await expect(page.getByTestId('photo-thumb')).toHaveCount(2);
-  });
+  }, 'photos');
 });
 
 test('undo/redo with the keyboard', async ({ page }, info) => {

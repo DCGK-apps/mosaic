@@ -1,6 +1,7 @@
-import { SlidersHorizontal } from 'lucide-react';
+import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Sidebar, UndoRedo } from './components/sidebar/Sidebar';
+import { NewProjectDialog } from './components/NewProjectDialog';
+import { Sidebar, UndoRedo, type PanelTab } from './components/sidebar/Sidebar';
 import { Workspace } from './components/workspace/Workspace';
 import { cx } from './components/cx';
 import { DEFAULT_DPI, DPI_OPTIONS, type ExportType } from './core/export';
@@ -19,6 +20,8 @@ export function App() {
   const desktop = useMediaQuery(DESKTOP);
   const [swapMode, setSwapMode] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [tab, setTab] = useState<PanelTab>('options');
+  const [newDialog, setNewDialog] = useState(false);
   const [dpi, setDpi] = useState(() => {
     const saved = loadPref('dpi', DEFAULT_DPI);
     return (DPI_OPTIONS as readonly number[]).includes(saved) ? saved : DEFAULT_DPI;
@@ -59,31 +62,65 @@ export function App() {
     [addFiles, onOpenProject],
   );
 
-  const onExport = async () => {
+  /** Renders and downloads the collage image; false when it failed (the user was told). */
+  const onExport = async (): Promise<boolean> => {
     setExporting(true);
     try {
       await exportMosaic(mosaic.doc, mosaic.urlOf, dpi, exportType);
+      return true;
     } catch {
       toast('Eksport nie powiódł się');
+      return false;
     } finally {
       setExporting(false);
     }
   };
 
+  const onSaveProject = (): boolean => {
+    try {
+      mosaic.saveProject();
+      return true;
+    } catch {
+      toast('Nie udało się zapisać projektu');
+      return false;
+    }
+  };
+
+  const startNewProject = () => {
+    mosaic.newProject();
+    setNewDialog(false);
+    setDrawerOpen(false);
+    setSwapMode(false);
+    toast('Nowy projekt');
+  };
+
+  const openDrawer = (t: PanelTab) => {
+    setTab(t);
+    setDrawerOpen(true);
+  };
+
   return (
     <div className="flex h-dvh flex-col bg-[#f8f9fa] font-sans text-slate-900 md:flex-row">
-      {/* Phone: top bar, settings in a drawer. */}
+      {/* Phone: top bar, photos and options in a drawer with two tabs. */}
       <header className="flex items-center justify-between bg-brand px-3 py-2 text-white md:hidden">
         <span className="text-lg font-bold tracking-wide">Mosaic</span>
         <div className="flex items-center gap-1">
           <UndoRedo mosaic={mosaic} dark />
           <button
             type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium hover:bg-white/20"
+            onClick={() => openDrawer('photos')}
+            className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 text-sm font-medium hover:bg-white/20"
+            data-testid="drawer-photos"
+          >
+            <ImagePlus className="h-4 w-4 max-[380px]:hidden" /> Dodaj zdjęcia
+          </button>
+          <button
+            type="button"
+            onClick={() => openDrawer('options')}
+            className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 text-sm font-medium hover:bg-white/20"
             data-testid="drawer-open"
           >
-            <SlidersHorizontal className="h-4 w-4" /> Ustawienia
+            <SlidersHorizontal className="h-4 w-4 max-[380px]:hidden" /> Opcje
           </button>
         </div>
       </header>
@@ -116,15 +153,12 @@ export function App() {
             setExportType(t);
             savePref('exportType', t);
           }}
-          onExport={onExport}
-          onSaveProject={() => {
-            try {
-              mosaic.saveProject();
-            } catch {
-              toast('Nie udało się zapisać projektu');
-            }
-          }}
+          onExport={() => void onExport()}
+          onSaveProject={onSaveProject}
           onOpenProject={() => projectInput.current?.click()}
+          onNewProject={() => setNewDialog(true)}
+          tab={tab}
+          onTab={setTab}
           onClose={() => setDrawerOpen(false)}
         />
       </aside>
@@ -155,6 +189,22 @@ export function App() {
           if (file) void onOpenProject(file);
         }}
       />
+
+      {newDialog && (
+        <NewProjectDialog
+          canExport={mosaic.doc.photos.length > 0}
+          imageLabel={`${exportType === 'png' ? 'PNG' : 'JPG'} · ${dpi} DPI`}
+          busy={exporting}
+          onSaveProject={() => {
+            if (onSaveProject()) startNewProject();
+          }}
+          onSaveImage={() => {
+            void onExport().then((ok) => ok && startNewProject());
+          }}
+          onDiscard={startNewProject}
+          onCancel={() => setNewDialog(false)}
+        />
+      )}
 
       <Workspace mosaic={mosaic} swapMode={swapMode} onFiles={(f) => void onFiles(f)} />
     </div>
