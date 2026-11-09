@@ -1,4 +1,4 @@
-import { FilePlus, Image as ImageIcon, Images, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { FilePlus, Images, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { cx } from '../cx';
 import type { ExportType } from '../../core/export';
 import type { Mosaic } from '../../hooks/useMosaic';
@@ -34,6 +34,11 @@ export interface SidebarProps {
   onClose?: () => void;
 }
 
+/** The app's own icon (the same as on the home screen). */
+export function AppIcon({ className }: { className?: string }) {
+  return <img src="./icons/icon-192.png" alt="" draggable={false} className={`${className ?? ''} shrink-0 rounded-lg bg-white`} data-testid="app-icon" />;
+}
+
 export function UndoRedo({ mosaic, dark }: { mosaic: Mosaic; dark?: boolean }) {
   const cls = dark
     ? 'rounded p-1.5 text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent'
@@ -59,7 +64,7 @@ export function Sidebar(props: SidebarProps) {
     <>
       <div className="relative bg-brand p-6 text-center text-white">
         <h1 className="flex items-center justify-center gap-2 text-2xl font-bold tracking-wide">
-          <ImageIcon className="h-6 w-6" /> Mosaic
+          <AppIcon className="h-8 w-8" /> Mosaic
         </h1>
         <p className="mt-1 text-sm text-blue-200 opacity-80">Idealne dopasowanie</p>
         <div className="absolute left-3 top-3 hidden md:block">
