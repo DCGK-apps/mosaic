@@ -23,7 +23,7 @@ test('the work comes back after reloading the page', async ({ page }) => {
   for (const img of await cells(page).locator('img').all()) {
     await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBeGreaterThan(0);
   }
-  await inPanel(page, () => expect(page.getByTestId('magazine-item')).toHaveCount(1));
+  await inPanel(page, () => expect(page.getByTestId('magazine-item')).toHaveCount(1), 'photos');
   // Undo history starts fresh after a reload.
   await expect(undoButton(page)).toBeDisabled();
 });
@@ -34,7 +34,7 @@ test('a photo deleted for good is gone after a reload', async ({ page }) => {
   await inPanel(page, async () => {
     await page.getByTestId('photo-thumb').first().getByRole('button').click();
     await page.getByTestId('magazine-delete').click();
-  });
+  }, 'photos');
   await page.evaluate(() => (window as any).__mosaic.flush());
   await page.reload();
   await expect(page.locator('body[data-ready="true"]')).toBeAttached();

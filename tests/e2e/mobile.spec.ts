@@ -30,3 +30,23 @@ test('undo is in the top bar', async ({ page }) => {
   await page.locator('header').getByTestId('undo').click();
   await expect.poll(async () => (await getDoc(page)).sheet.widthMm).toBe(504);
 });
+
+test('"Dodaj zdjęcia" and "Opcje" open separate tabs of the drawer', async ({ page }) => {
+  await addPhotos(page, ['square']);
+  await expect(page.getByTestId('drawer-open')).toHaveText('Opcje');
+
+  await page.getByTestId('drawer-photos').click();
+  await expect(page.getByTestId('add-photos')).toBeInViewport();
+  await expect(page.getByTestId('photo-thumb')).toHaveCount(1);
+  await expect(page.getByTestId('rotate')).toBeHidden();
+  // Switch tabs inside the drawer.
+  await page.getByTestId('tab-options').click();
+  await expect(page.getByTestId('rotate')).toBeVisible();
+  await expect(page.getByTestId('add-photos')).toBeHidden();
+  await page.getByTestId('drawer-close').click();
+
+  await page.getByTestId('drawer-open').click();
+  await expect(page.getByTestId('tab-options')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('add-photos')).toBeHidden();
+  await expect(page.getByTestId('project-new')).toBeVisible();
+});

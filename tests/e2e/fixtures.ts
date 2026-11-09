@@ -52,9 +52,13 @@ export async function addPhotos(page: Page, names: readonly string[] = PHOTOS): 
   await expect(cells(page)).toHaveCount(before + names.length);
 }
 
-/** Runs `fn` with the settings visible – on a phone they are in a drawer, closed afterwards. */
-export async function inPanel(page: Page, fn: () => Promise<void>): Promise<void> {
-  const open = page.getByTestId('drawer-open');
+/**
+ * Runs `fn` with the panel visible – on a phone it is a drawer with two tabs
+ * ("Dodaj zdjęcia": photos and magazine, "Opcje": everything else), opened
+ * on `tab` and closed afterwards.
+ */
+export async function inPanel(page: Page, fn: () => Promise<void>, tab: 'photos' | 'options' = 'options'): Promise<void> {
+  const open = page.getByTestId(tab === 'photos' ? 'drawer-photos' : 'drawer-open');
   const mobile = await open.isVisible();
   if (mobile) {
     await open.click();
