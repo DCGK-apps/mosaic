@@ -1,7 +1,7 @@
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NewProjectDialog } from './components/NewProjectDialog';
-import { Sidebar, UndoRedo, type PanelTab } from './components/sidebar/Sidebar';
+import { AppIcon, Sidebar, UndoRedo, type PanelTab } from './components/sidebar/Sidebar';
 import { Workspace } from './components/workspace/Workspace';
 import { cx } from './components/cx';
 import { DEFAULT_DPI, DPI_OPTIONS, type ExportType } from './core/export';
@@ -102,25 +102,27 @@ export function App() {
   return (
     <div className="flex h-dvh flex-col bg-[#f8f9fa] font-sans text-slate-900 md:flex-row">
       {/* Phone: top bar, photos and options in a drawer with two tabs. */}
-      <header className="flex items-center justify-between bg-brand px-3 py-2 text-white md:hidden">
-        <span className="text-lg font-bold tracking-wide">Mosaic</span>
-        <div className="flex items-center gap-1">
+      <header className="flex items-center justify-between gap-2 bg-brand px-3 py-2 max-[400px]:px-2 text-white md:hidden">
+        <span className="flex min-w-0 items-center gap-1.5 text-lg font-bold tracking-wide max-[400px]:text-base max-[400px]:tracking-normal">
+          <AppIcon className="h-7 w-7 max-[400px]:h-6 max-[400px]:w-6" /> Mosaic
+        </span>
+        <div className="flex flex-none items-center gap-1">
           <UndoRedo mosaic={mosaic} dark />
           <button
             type="button"
             onClick={() => openDrawer('photos')}
-            className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 text-sm font-medium hover:bg-white/20"
+            className="flex items-center gap-1.5 flex-none whitespace-nowrap rounded-md bg-white/10 px-2.5 py-1.5 max-[400px]:px-2 text-sm font-medium hover:bg-white/20"
             data-testid="drawer-photos"
           >
-            <ImagePlus className="h-4 w-4 max-[380px]:hidden" /> Dodaj zdjęcia
+            <ImagePlus className="h-4 w-4 max-[440px]:hidden" /> Dodaj zdjęcia
           </button>
           <button
             type="button"
             onClick={() => openDrawer('options')}
-            className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 text-sm font-medium hover:bg-white/20"
+            className="flex items-center gap-1.5 flex-none whitespace-nowrap rounded-md bg-white/10 px-2.5 py-1.5 max-[400px]:px-2 text-sm font-medium hover:bg-white/20"
             data-testid="drawer-open"
           >
-            <SlidersHorizontal className="h-4 w-4 max-[380px]:hidden" /> Opcje
+            <SlidersHorizontal className="h-4 w-4 max-[440px]:hidden" /> Opcje
           </button>
         </div>
       </header>
