@@ -58,7 +58,7 @@ describe('project file', () => {
   });
 
   it('names the file after the sheet and recognises the extension', () => {
-    expect(projectFileName(sample())).toBe('kolaz_504x506.mosaic');
+    expect(projectFileName(sample())).toBe('kolaz_504x506mm.mosaic');
     expect(isProjectFile({ name: 'Wakacje.MOSAIC' })).toBe(true);
     expect(isProjectFile({ name: 'zdjecie.jpg' })).toBe(false);
   });

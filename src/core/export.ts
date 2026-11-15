@@ -70,6 +70,13 @@ export function drawMosaic(
   }
 }
 
-export function exportFileName(sheet: Pick<Sheet, 'widthMm' | 'heightMm'>, type: ExportType): string {
-  return `kolaz_${sheet.widthMm}x${sheet.heightMm}.${type === 'png' ? 'png' : 'jpg'}`;
+export const exportExt = (type: ExportType): string => (type === 'png' ? '.png' : '.jpg');
+
+/** Default name (without the extension); it ends with a letter so the size is not taken for a counter. */
+export function defaultFileBase(sheet: Pick<Sheet, 'widthMm' | 'heightMm'>): string {
+  return `kolaz_${sheet.widthMm}x${sheet.heightMm}mm`;
+}
+
+export function exportFileName(sheet: Pick<Sheet, 'widthMm' | 'heightMm'>, type: ExportType, base = defaultFileBase(sheet)): string {
+  return base + exportExt(type);
 }

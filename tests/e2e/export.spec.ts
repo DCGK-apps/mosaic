@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 import { addPhotos, cells, COLORS, getDoc, inPanel, openApp, pngSize } from './fixtures';
 
 async function exportFile(page: Page) {
-  const [download] = await Promise.all([page.waitForEvent('download'), inPanel(page, () => page.getByTestId('export').click())]);
+  let download!: Download;
+  await inPanel(page, async () => {
+    await page.getByTestId('export').click();
+    [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('filename-save').click()]);
+  });
   return { name: download.suggestedFilename(), data: readFileSync((await download.path())!) };
 }
 
@@ -35,7 +39,7 @@ test('the saved file looks like the preview: same cells, frame and colours', asy
   });
   await inPanel(page, () => expect(page.getByTestId('export-size')).toHaveText('1984 × 1992 px'));
   const file = await exportFile(page);
-  expect(file.name).toBe('kolaz_504x506.jpg');
+  expect(file.name).toBe('kolaz_504x506mm.jpg');
 
   // Sample the centre of every cell and the middle of each frame, using the preview's own geometry.
   const sheet = await page.getByTestId('sheet').boundingBox();
@@ -62,7 +66,7 @@ test('PNG export with the chosen resolution', async ({ page }) => {
     await page.getByTestId('dpi').selectOption('150');
   });
   const file = await exportFile(page);
-  expect(file.name).toBe('kolaz_210x297.png');
+  expect(file.name).toBe('kolaz_210x297mm.png');
   expect(pngSize(file.data)).toEqual({ w: 1240, h: 1754 });
 });
 

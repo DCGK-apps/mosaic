@@ -10,7 +10,7 @@ export function maxPixels(): number {
 }
 
 /** Renders the mosaic to an image file and lets the browser download it. */
-export async function exportMosaic(doc: Doc, urlOf: (photoId: string) => string | undefined, dpi: number, type: ExportType): Promise<void> {
+export async function exportMosaic(doc: Doc, urlOf: (photoId: string) => string | undefined, dpi: number, type: ExportType, name?: string): Promise<void> {
   const size = exportSize(doc.sheet, dpi, maxPixels());
   const images = new Map<string, HTMLImageElement>();
   await Promise.all(
@@ -27,5 +27,5 @@ export async function exportMosaic(doc: Doc, urlOf: (photoId: string) => string 
   drawMosaic(ctx, { tree: currentTree(doc), sheet: doc.sheet, photos: doc.photos }, images, size.pxPerMm);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, `image/${type}`, 0.95));
   if (!blob) throw new Error('Nie udało się zapisać obrazu');
-  download(blob, exportFileName(doc.sheet, type));
+  download(blob, exportFileName(doc.sheet, type, name));
 }
