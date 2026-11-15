@@ -2,15 +2,15 @@ import { Download, FolderOpen, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { DPI_OPTIONS, exportExt, type ExportType } from '../core/export';
 import { cleanName } from '../core/filename';
-import { seriesFileBase } from '../core/batch';
 import type { Doc } from '../core/types';
-import { canPickFolder, existingNames, pickFolder, saveSeries, seriesNames, type DirHandle } from '../autoCollage';
+import { canPickFolder, existingNames, pickFolder, saveSeries, seriesNames, type DirHandle, type SeriesFailure, type SeriesItem } from '../autoCollage';
 import { collagesWord } from '../plural';
 import { loadPref, savePref } from '../prefs';
 import { toast } from '../toast';
 import { cx } from './cx';
 
 interface Props {
+  /** All collages of the series, in order – empty ones are skipped, but keep their number. */
   docs: Doc[];
   urlOf: (photoId: string) => string | undefined;
   dpi: number;
@@ -26,12 +26,18 @@ export function SeriesSaveDialog({ docs, urlOf, dpi, type, onDpi, onType, onClos
   const [value, setValue] = useState(() => loadPref('lastSeriesName', 'kolaz'));
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [overwrite, setOverwrite] = useState<{ dir: DirHandle; names: string[] } | null>(null);
+  /** The last save had failures: what was saved, what was not and why. */
+  const [report, setReport] = useState<{ dir: DirHandle | null; saved: number; failed: SeriesFailure[] } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const ext = exportExt(type);
   const base = cleanName(value, ext).replace(/_\d{3,}$/, '');
   const folder = canPickFolder();
   const busy = progress !== null;
   const count = docs.length;
+  // The number of a file is the collage's number in the panel, so a reported failure is easy to find.
+  const names = seriesNames(base || 'kolaz', count, type);
+  const items: SeriesItem[] = docs.flatMap((doc, i) => (doc.photos.length ? [{ doc, name: names[i]! }] : []));
+  const empty = names.filter((_, i) => docs[i]!.photos.length === 0);
 
   useEffect(() => {
     input.current?.focus();
@@ -46,18 +52,21 @@ export function SeriesSaveDialog({ docs, urlOf, dpi, type, onDpi, onType, onClos
     return () => window.removeEventListener('keydown', onKey);
   }, [busy, onClose]);
 
-  const run = async (dir: DirHandle | null) => {
+  const run = async (dir: DirHandle | null, todo: SeriesItem[] = items, savedBefore = 0) => {
     setOverwrite(null);
-    setProgress({ done: 0, total: count });
-    try {
-      await saveSeries(docs, urlOf, dpi, type, base, dir, (done, total) => setProgress({ done, total }));
-      savePref('lastSeriesName', base);
-      toast(dir ? `Zapisano ${count} ${collagesWord(count)} w folderze ${dir.name}` : `Zapisano ${count} ${collagesWord(count)} (ZIP)`);
-      onClose();
-    } catch {
-      setProgress(null);
-      toast('Nie udało się zapisać kolaży');
+    setReport(null);
+    setProgress({ done: 0, total: todo.length });
+    const zipName = todo === items ? `${base}.zip` : `${base}_ponownie.zip`;
+    const { saved, failed } = await saveSeries(todo, urlOf, dpi, type, zipName, dir, (done, total) => setProgress({ done, total }));
+    setProgress(null);
+    const total = savedBefore + saved.length;
+    if (total > 0) savePref('lastSeriesName', base);
+    if (failed.length) {
+      setReport({ dir, saved: total, failed });
+      return;
     }
+    toast(dir ? `Zapisano ${total} ${collagesWord(total)} w folderze ${dir.name}` : `Zapisano ${total} ${collagesWord(total)} (ZIP)`);
+    onClose();
   };
 
   const start = async () => {
@@ -71,12 +80,13 @@ export function SeriesSaveDialog({ docs, urlOf, dpi, type, onDpi, onType, onClos
       return;
     }
     if (!dir) return;
-    const taken = await existingNames(dir, seriesNames(base, count, type));
+    const taken = await existingNames(
+      dir,
+      items.map((it) => it.name),
+    );
     if (taken.length) setOverwrite({ dir, names: taken });
     else await run(dir);
   };
-
-  const names = seriesNames(base || 'kolaz', count, type);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => !busy && onClose()} data-testid="series-save-dialog">
@@ -88,14 +98,14 @@ export function SeriesSaveDialog({ docs, urlOf, dpi, type, onDpi, onType, onClos
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!busy && !overwrite) void start();
+          if (!busy && !overwrite && !report) void start();
         }}
       >
         <button type="button" onClick={onClose} disabled={busy} className="absolute right-3 top-3 rounded p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30" aria-label="Anuluj">
           <X className="h-5 w-5" />
         </button>
         <h2 id="series-save-title" className="pr-8 text-lg font-bold text-slate-900">
-          Zapisz wszystkie kolaże ({count})
+          Zapisz wszystkie kolaże ({items.length})
         </h2>
 
         <fieldset disabled={busy} className="mt-3 space-y-4">
@@ -179,25 +189,66 @@ export function SeriesSaveDialog({ docs, urlOf, dpi, type, onDpi, onType, onClos
           </div>
         )}
 
+        {empty.length > 0 && !report && (
+          <p className="mt-4 text-xs text-slate-500" data-testid="series-empty">
+            {empty.length === 1 ? 'Pusty kolaż (bez zdjęć) nie zostanie zapisany' : `Puste kolaże (${empty.length}, bez zdjęć) nie zostaną zapisane`}: {empty.join(', ')}.
+          </p>
+        )}
+
+        {report && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900" data-testid="series-report">
+            <p className="font-bold">
+              Zapisano {report.saved} z {report.saved + report.failed.length}. Nie udało się zapisać:
+            </p>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
+              {report.failed.map((f) => (
+                <li key={f.item.name} data-testid="series-failed">
+                  <b>{f.item.name}</b> – {f.reason}
+                </li>
+              ))}
+            </ul>
+            {!report.dir && report.saved > 0 && <p className="mt-2 text-xs">Zapisane kolaże są w pobranym pliku ZIP.</p>}
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-white" data-testid="series-report-close">
+                Zamknij
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void run(
+                    report.dir,
+                    report.failed.map((f) => f.item),
+                    report.saved,
+                  )
+                }
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-red-700"
+                data-testid="series-retry"
+              >
+                Spróbuj ponownie ({report.failed.length})
+              </button>
+            </div>
+          </div>
+        )}
+
         {progress ? (
           <div className="mt-5" data-testid="series-progress">
             <div className="mb-1 text-xs text-slate-600">
-              Zapisywanie {Math.min(progress.done + 1, progress.total)} / {progress.total} ({seriesFileBase(base, Math.min(progress.done + 1, progress.total))}
-              {ext})
+              Zapisywanie {Math.min(progress.done + 1, progress.total)} / {progress.total}
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-slate-200">
               <div className="h-full bg-brand transition-[width]" style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }} />
             </div>
           </div>
         ) : (
-          !overwrite && (
+          !overwrite &&
+          !report && (
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
                 Anuluj
               </button>
               <button
                 type="submit"
-                disabled={!base || count === 0}
+                disabled={!base || items.length === 0}
                 className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-40"
                 data-testid="series-save"
               >

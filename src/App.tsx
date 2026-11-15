@@ -133,8 +133,8 @@ export function App() {
     toast(`Utworzono ${result.docs.length} ${collagesWord(result.docs.length)} z ${photos} ${photosWord(photos)}${result.skipped ? ` (pominięto ${result.skipped})` : ''}`);
   };
 
-  /** The collages to save: the edited one as it is now, empty ones left out. */
-  const seriesDocs = () => mosaic.batch.map((d) => (d.batchKey === mosaic.doc.batchKey ? mosaic.doc : d)).filter((d) => d.photos.length > 0);
+  /** The collages to save, the edited one as it is now (the dialog skips empty ones). */
+  const seriesDocs = () => mosaic.batch.map((d) => (d.batchKey === mosaic.doc.batchKey ? mosaic.doc : d));
 
   const openDrawer = (t: PanelTab) => {
     setTab(t);

@@ -143,6 +143,65 @@ test.describe('computer', () => {
     expect(written['wakacje_002.jpg']).toBeGreaterThan(1000);
   });
 
+  test('a collage that fails does not stop the others; it is reported and can be saved again', async ({ page }) => {
+    await page.addInitScript(() => {
+      const written: string[] = [];
+      let failNext = true;
+      (window as any).__written = written;
+      (window as any).showDirectoryPicker = async () => ({
+        name: 'Kolaże',
+        getFileHandle: async (name: string, opts?: { create?: boolean }) => {
+          if (!opts?.create) throw new DOMException('missing', 'NotFoundError');
+          return {
+            createWritable: async () => {
+              // The first collage cannot be written once (e.g. the file is open in another program).
+              if (name.endsWith('_001.jpg') && failNext) {
+                failNext = false;
+                throw new DOMException('busy', 'NoModificationAllowedError');
+              }
+              return { write: async () => void written.push(name), close: async () => undefined };
+            },
+          };
+        },
+      });
+    });
+    await page.reload();
+    await createSeries(page);
+    await page.getByTestId('batch-save-all').click();
+    await page.getByTestId('series-name').fill('lato');
+    await page.getByTestId('series-save').click();
+    await expect(page.getByTestId('series-report')).toContainText('Zapisano 1 z 2');
+    await expect(page.getByTestId('series-failed')).toHaveText(/lato_001\.jpg – plik jest otwarty w innym programie/);
+    expect(await page.evaluate(() => (window as any).__written)).toEqual(['lato_002.jpg']);
+
+    await page.getByTestId('series-retry').click();
+    await expect(page.getByTestId('series-save-dialog')).toBeHidden();
+    expect(await page.evaluate(() => (window as any).__written)).toEqual(['lato_002.jpg', 'lato_001.jpg']);
+    await expect(page.locator('#toast')).toHaveText('Zapisano 2 kolaże w folderze Kolaże');
+  });
+
+  test('empty collages are not saved, and the dialog says so', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).showDirectoryPicker = undefined;
+    });
+    await page.reload();
+    await createSeries(page);
+    const [first] = await getBatch(page);
+    for (let i = 0; i < first.photos.length; i++) {
+      const cell = cells(page).first();
+      await cell.hover();
+      await cell.getByTestId('cell-remove').click();
+    }
+    await expect(cells(page)).toHaveCount(0);
+    await page.getByTestId('batch-save-all').click();
+    await page.getByTestId('series-name').fill('lato');
+    await expect(page.getByTestId('series-empty')).toHaveText('Pusty kolaż (bez zdjęć) nie zostanie zapisany: lato_001.jpg.');
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('series-save').click()]);
+    const zip = readFileSync(await download.path());
+    expect(zip.readUInt16LE(zip.length - 22 + 10)).toBe(1);
+    expect(zip.includes(Buffer.from('lato_002.jpg'))).toBe(true);
+  });
+
   test('without folder access the series is saved as one ZIP file', async ({ page }) => {
     await page.addInitScript(() => {
       (window as any).showDirectoryPicker = undefined;

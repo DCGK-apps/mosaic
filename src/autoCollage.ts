@@ -11,7 +11,7 @@ import { randomSeed } from './core/random';
 import type { Doc, Photo } from './core/types';
 import { zipParts } from './core/zip';
 import { download } from './download';
-import { renderMosaic } from './exporter';
+import { renderMosaic, RenderError } from './exporter';
 import { readImageWithThumb, type ImageEntry } from './images';
 import { newPhotoId } from './hooks/useMosaic';
 
@@ -179,32 +179,88 @@ export function seriesNames(base: string, count: number, type: ExportType): stri
   return Array.from({ length: count }, (_, i) => seriesFileBase(base, i + 1) + exportExt(type));
 }
 
+/** One collage to save and its file name. */
+export interface SeriesItem {
+  doc: Doc;
+  name: string;
+}
+
+export interface SeriesFailure {
+  item: SeriesItem;
+  /** What went wrong, for the user. */
+  reason: string;
+}
+
+/** A short explanation of why one collage was not saved. */
+export function failureReason(e: unknown, stage: 'render' | 'write'): string {
+  if (e instanceof RenderError) {
+    return e.kind === 'photo'
+      ? `nie można odczytać zdjęcia „${e.photo}” – czy plik nie został przeniesiony, usunięty lub zmieniony?`
+      : 'za mało pamięci przeglądarki – spróbuj niższej jakości (DPI) albo zamknij inne karty';
+  }
+  if (stage === 'write') {
+    const name = e instanceof DOMException ? e.name : '';
+    if (name === 'NotAllowedError') return 'brak zgody na zapis w tym folderze';
+    if (name === 'QuotaExceededError') return 'brak miejsca na dysku';
+    if (name === 'NoModificationAllowedError' || name === 'InvalidStateError') return 'plik jest otwarty w innym programie albo tylko do odczytu';
+    return `nie można zapisać pliku${name ? ` (${name})` : ''}`;
+  }
+  return 'nie udało się utworzyć obrazu';
+}
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * Renders every collage and writes it into `dir` – or, without a folder, packs
- * them into one ZIP file that the browser downloads.
+ * them into one ZIP file that the browser downloads. A collage that fails does
+ * not stop the others: it is tried once more after a short pause (memory is
+ * often freed by then), and the ones that still fail are returned with the reason.
  */
 export async function saveSeries(
-  docs: readonly Doc[],
+  items: readonly SeriesItem[],
   urlOf: (photoId: string) => string | undefined,
   dpi: number,
   type: ExportType,
-  base: string,
+  zipName: string,
   dir: DirHandle | null,
   onProgress: (done: number, total: number) => void,
-): Promise<void> {
-  const names = seriesNames(base, docs.length, type);
+  render: typeof renderMosaic = renderMosaic,
+): Promise<{ saved: string[]; failed: SeriesFailure[] }> {
+  const saved: string[] = [];
+  const failed: SeriesFailure[] = [];
   const zip: { name: string; data: Uint8Array }[] = [];
-  for (const [i, doc] of docs.entries()) {
-    onProgress(i, docs.length);
-    const blob = await renderMosaic(doc, urlOf, dpi, type);
-    if (dir) {
-      const file = await (await dir.getFileHandle(names[i]!, { create: true })).createWritable();
-      await file.write(blob);
-      await file.close();
-    } else {
-      zip.push({ name: names[i]!, data: new Uint8Array(await blob.arrayBuffer()) });
+  for (const [i, item] of items.entries()) {
+    onProgress(i, items.length);
+    let blob: Blob | null = null;
+    let error: unknown;
+    for (let attempt = 0; attempt < 2 && !blob; attempt++) {
+      if (attempt) await pause(500);
+      try {
+        blob = await render(item.doc, urlOf, dpi, type);
+      } catch (e) {
+        error = e;
+        // An unreadable photo will not get better on a second try.
+        if (e instanceof RenderError && e.kind === 'photo') break;
+      }
+    }
+    if (!blob) {
+      failed.push({ item, reason: failureReason(error, 'render') });
+      continue;
+    }
+    try {
+      if (dir) {
+        const file = await (await dir.getFileHandle(item.name, { create: true })).createWritable();
+        await file.write(blob);
+        await file.close();
+      } else {
+        zip.push({ name: item.name, data: new Uint8Array(await blob.arrayBuffer()) });
+      }
+      saved.push(item.name);
+    } catch (e) {
+      failed.push({ item, reason: failureReason(e, 'write') });
     }
   }
-  onProgress(docs.length, docs.length);
-  if (!dir) download(new Blob(zipParts(zip) as BlobPart[], { type: 'application/zip' }), `${base}.zip`);
+  onProgress(items.length, items.length);
+  if (!dir && zip.length) download(new Blob(zipParts(zip) as BlobPart[], { type: 'application/zip' }), zipName);
+  return { saved, failed };
 }
