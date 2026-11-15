@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchCopy, buildBatch, clampRange, collageCount, planBatch, seriesFileBase, sortFiles, writeBack, type BatchOptions } from '../../src/core/batch';
+import { batchCopy, buildBatch, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, writeBack, type BatchOptions } from '../../src/core/batch';
 import { currentTree, DEFAULT_SHEET, docReducer } from '../../src/core/doc';
 import { leaves } from '../../src/core/tree';
 import { photo } from './helpers';
@@ -26,6 +26,15 @@ describe('sortFiles', () => {
   it('breaks date ties by name', () => {
     const same = [{ path: 'b.jpg', modified: 1 }, { path: 'a.jpg', modified: 1 }];
     expect(sortFiles(same, 'date').map((f) => f.path)).toEqual(['a.jpg', 'b.jpg']);
+  });
+});
+
+describe('inChosenFolder', () => {
+  it('tells files of the chosen folder from those in its subfolders', () => {
+    expect(inChosenFolder('Wakacje/IMG_1.jpg')).toBe(true);
+    expect(inChosenFolder('IMG_1.jpg')).toBe(true);
+    expect(inChosenFolder('Wakacje/2024/IMG_1.jpg')).toBe(false);
+    expect(inChosenFolder('Wakacje/a/b/IMG_1.jpg')).toBe(false);
   });
 });
 

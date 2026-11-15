@@ -1,9 +1,9 @@
 import { FolderOpen, LayoutDashboard, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { clampRange, collageCount, MAX_BATCH_PHOTOS, MAX_PER_COLLAGE, type BatchOrder } from '../core/batch';
+import { clampRange, collageCount, inChosenFolder, MAX_BATCH_PHOTOS, MAX_PER_COLLAGE, type BatchOrder } from '../core/batch';
 import { docReducer, emptyDoc } from '../core/doc';
 import type { LayoutMode, Sheet } from '../core/types';
-import { Cancelled, createSeries, folderName, photoFiles, type Progress, type SeriesResult } from '../autoCollage';
+import { Cancelled, createSeries, folderName, pathOf, photoFiles, type Progress, type SeriesResult } from '../autoCollage';
 import { collagesWord, photosWord } from '../plural';
 import { loadPref, savePref } from '../prefs';
 import { cx } from './cx';
@@ -30,8 +30,12 @@ const patchSheet = (sheet: Sheet, patch: Partial<Sheet>) => docReducer({ ...empt
 
 /** "Kolaże z folderu": the user picks a folder and the rules, the app makes the whole series. */
 export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, existing, onDone, onCancel }: Props) {
-  const [files, setFiles] = useState<File[]>([]);
+  /** Photos in the chosen folder and in the folders inside it. */
+  const [allFiles, setAllFiles] = useState<File[]>([]);
   const [folder, setFolder] = useState('');
+  const [subfolders, setSubfolders] = useState(() => loadPref<unknown>('autoSubfolders', false) === true);
+  const files = subfolders ? allFiles : allFiles.filter((f) => inChosenFolder(pathOf(f)));
+  const nested = allFiles.length - allFiles.filter((f) => inChosenFolder(pathOf(f))).length;
   const [min, setMin] = useState(() => loadPref('autoMin', 3));
   const [max, setMax] = useState(() => loadPref('autoMax', 6));
   const [order, setOrder] = useState<BatchOrder>(() => (loadPref<string>('autoOrder', 'date') === 'name' ? 'name' : 'date'));
@@ -66,6 +70,7 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
     savePref('autoMin', range.min);
     savePref('autoMax', range.max);
     savePref('autoOrder', order);
+    savePref('autoSubfolders', subfolders);
     setMin(range.min);
     setMax(range.max);
     setError('');
@@ -116,7 +121,7 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
                 className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm font-bold text-slate-600 transition-colors hover:border-brand hover:bg-slate-50 hover:text-brand"
                 data-testid="auto-pick-folder"
               >
-                <FolderOpen className="h-5 w-5" /> {files.length ? 'Zmień folder…' : 'Wybierz folder…'}
+                <FolderOpen className="h-5 w-5" /> {folder ? 'Zmień folder…' : 'Wybierz folder…'}
               </button>
               <input
                 ref={folderInput}
@@ -128,7 +133,7 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
                   const all = Array.from(e.target.files ?? []);
                   e.target.value = '';
                   if (!all.length) return;
-                  setFiles(photoFiles(all));
+                  setAllFiles(photoFiles(all));
                   setFolder(folderName(all));
                   setError('');
                 }}
@@ -136,9 +141,20 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
               {folder && (
                 <p className="mt-2 text-sm text-slate-700" data-testid="auto-folder-info">
                   <b>{folder}</b>: {files.length} {photosWord(files.length)}
+                  {!subfolders && nested > 0 && <span className="text-slate-500"> (+{nested} w podfolderach)</span>}
                   {files.length === 0 && ' – brak zdjęć (JPG, PNG, WebP)'}
                 </p>
               )}
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={subfolders}
+                  onChange={(e) => setSubfolders(e.target.checked)}
+                  className="h-4 w-4 accent-brand"
+                  data-testid="auto-subfolders"
+                />
+                Uwzględnij zdjęcia z podfolderów
+              </label>
               {files.length > MAX_BATCH_PHOTOS && (
                 <p className="mt-1 text-xs text-amber-700" data-testid="auto-limit">
                   Jednorazowo można użyć do {MAX_BATCH_PHOTOS} zdjęć – zostanie wziętych pierwszych {MAX_BATCH_PHOTOS} (w wybranej kolejności).
