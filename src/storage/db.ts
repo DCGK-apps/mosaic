@@ -3,10 +3,13 @@
  * original image files (Blobs), so everything comes back after a reload.
  */
 const DB_NAME = 'mosaic';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STATE = 'state';
 const IMAGES = 'images';
+/** Small previews of the photos of an automatic series (since version 2). */
+const THUMBS = 'thumbs';
 const DOC_KEY = 'current';
+const BATCH_KEY = 'batch';
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -33,6 +36,7 @@ export class MosaicDb {
         const db = req.result;
         if (!db.objectStoreNames.contains(STATE)) db.createObjectStore(STATE);
         if (!db.objectStoreNames.contains(IMAGES)) db.createObjectStore(IMAGES);
+        if (!db.objectStoreNames.contains(THUMBS)) db.createObjectStore(THUMBS);
       };
       req.onsuccess = () => resolve(new MosaicDb(req.result));
       req.onerror = () => reject(req.error);
@@ -49,21 +53,56 @@ export class MosaicDb {
     await done(tx);
   }
 
-  async putImage(id: string, blob: Blob): Promise<void> {
-    const tx = this.db.transaction(IMAGES, 'readwrite');
-    tx.objectStore(IMAGES).put(blob, id);
+  /** The collages of the automatic series. */
+  async loadBatch(): Promise<unknown> {
+    return request(this.db.transaction(STATE).objectStore(STATE).get(BATCH_KEY));
+  }
+
+  async saveBatch(saved: unknown): Promise<void> {
+    const tx = this.db.transaction(STATE, 'readwrite');
+    tx.objectStore(STATE).put(saved, BATCH_KEY);
     await done(tx);
   }
 
-  async loadImages(): Promise<Map<string, Blob>> {
-    const store = this.db.transaction(IMAGES).objectStore(IMAGES);
+  putImage(id: string, blob: Blob): Promise<void> {
+    return this.put(IMAGES, id, blob);
+  }
+
+  loadImages(): Promise<Map<string, Blob>> {
+    return this.loadAll(IMAGES);
+  }
+
+  deleteImages(ids: Iterable<string>): Promise<void> {
+    return this.delete(IMAGES, ids);
+  }
+
+  putThumb(id: string, blob: Blob): Promise<void> {
+    return this.put(THUMBS, id, blob);
+  }
+
+  loadThumbs(): Promise<Map<string, Blob>> {
+    return this.loadAll(THUMBS);
+  }
+
+  deleteThumbs(ids: Iterable<string>): Promise<void> {
+    return this.delete(THUMBS, ids);
+  }
+
+  private async put(storeName: string, id: string, blob: Blob): Promise<void> {
+    const tx = this.db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).put(blob, id);
+    await done(tx);
+  }
+
+  private async loadAll(storeName: string): Promise<Map<string, Blob>> {
+    const store = this.db.transaction(storeName).objectStore(storeName);
     const [keys, values] = await Promise.all([request(store.getAllKeys()), request(store.getAll())]);
     return new Map(keys.map((k, i) => [String(k), values[i] as Blob]));
   }
 
-  async deleteImages(ids: Iterable<string>): Promise<void> {
-    const tx = this.db.transaction(IMAGES, 'readwrite');
-    const store = tx.objectStore(IMAGES);
+  private async delete(storeName: string, ids: Iterable<string>): Promise<void> {
+    const tx = this.db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
     for (const id of ids) store.delete(id);
     await done(tx);
   }

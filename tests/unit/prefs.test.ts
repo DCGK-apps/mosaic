@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { collagesWord, photosWord } from '../../src/plural';
 import { PREFS_KEY, loadPref, savePref } from '../../src/prefs';
 
 class MemoryStorage {
@@ -31,5 +32,12 @@ describe('prefs', () => {
   it('falls back when storage holds garbage', () => {
     localStorage.setItem(PREFS_KEY, '{not json');
     expect(loadPref('a', 'x')).toBe('x');
+  });
+});
+
+describe('plural', () => {
+  it('declines Polish nouns', () => {
+    expect([1, 2, 5, 12, 22, 25, 104].map(photosWord)).toEqual(['zdjęcie', 'zdjęcia', 'zdjęć', 'zdjęć', 'zdjęcia', 'zdjęć', 'zdjęcia']);
+    expect([1, 3, 11, 0].map(collagesWord)).toEqual(['kolaż', 'kolaże', 'kolaży', 'kolaży']);
   });
 });

@@ -86,8 +86,26 @@ export function restoreDoc(raw: unknown, hasImage: (photoId: string) => boolean)
     tree: prune(parseNode(d.tree)),
     autoHistory,
     autoIndex: Math.min(Math.max(0, Math.floor(num(d.autoIndex, 0))), Math.max(0, autoHistory.length - 1)),
+    ...(str(d.batchKey) ? { batchKey: d.batchKey } : {}),
   };
   // Clamp the sheet values through the reducer, so the limits live in one place.
   doc = docReducer(doc, { type: 'setSheet', patch: {} });
   return doc;
+}
+
+export interface SavedBatch {
+  version: number;
+  docs: Doc[];
+}
+
+export function toSavedBatch(docs: Doc[]): SavedBatch {
+  return { version: SAVE_VERSION, docs };
+}
+
+/** The collages of an automatic series; broken ones and ones without photos are dropped. */
+export function restoreBatch(raw: unknown, hasImage: (photoId: string) => boolean): Doc[] {
+  if (!isObj(raw) || raw.version !== SAVE_VERSION || !Array.isArray(raw.docs)) return [];
+  return raw.docs
+    .map((doc) => restoreDoc({ version: SAVE_VERSION, doc }, hasImage))
+    .filter((d): d is Doc => !!d && !!d.batchKey && d.photos.length > 0);
 }

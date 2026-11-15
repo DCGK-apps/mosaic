@@ -1,4 +1,4 @@
-import { FilePlus, Images, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { FilePlus, Images, LayoutDashboard, Redo2, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { cx } from '../cx';
 import type { ExportType } from '../../core/export';
 import type { Mosaic } from '../../hooks/useMosaic';
@@ -28,6 +28,8 @@ export interface SidebarProps {
   onSaveProject: () => void;
   onOpenProject: () => void;
   onNewProject: () => void;
+  /** Computer only: "Kolaże z folderu" – an automatic series of collages. */
+  onAutoCollage?: () => void;
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   /** Mobile only: closes the drawer. */
@@ -116,6 +118,16 @@ export function Sidebar(props: SidebarProps) {
       <div className={cx('p-6 md:pb-0', tab !== 'photos' && 'max-md:hidden')} role="tabpanel" data-testid="panel-photos">
         <div>
           <PhotosSection photos={doc.photos} urlOf={urlOf} onAdd={onAddPhotos} onRemove={(photoId) => act({ type: 'toMagazine', photoId })} />
+          {props.onAutoCollage && (
+            <button
+              type="button"
+              onClick={props.onAutoCollage}
+              data-testid="auto-collage"
+              className="mt-3 hidden w-full items-center justify-center gap-2 rounded-lg border border-brand py-2.5 text-sm font-bold text-brand transition-colors hover:bg-blue-50 md:flex"
+            >
+              <LayoutDashboard className="h-4 w-4" /> Kolaże z folderu…
+            </button>
+          )}
           <MagazineSection
             photos={doc.magazine}
             urlOf={urlOf}

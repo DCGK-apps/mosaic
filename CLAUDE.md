@@ -40,10 +40,15 @@ src/core/          czysta logika (testy w tests/unit)
   export.ts        drawMosaic (canvas), exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
   filename.ts      nazwa pliku przy zapisie: suggestName / rememberName / cleanName
+  batch.ts         seria „Kolaże z folderu”: sortFiles, planBatch (DP – podział na kolaże), buildBatch,
+                   writeBack, seriesFileBase ("nazwa_001"); MAX_BATCH_PHOTOS = 500, MAX_PER_COLLAGE = 20
+  exif.ts          data wykonania z EXIF (DateTimeOriginal / DateTime) z pierwszych 128 KB pliku JPEG
+  zip.ts           zapis ZIP bez kompresji (crc32, zipParts)
   formats.ts random.ts
 src/storage/
-  db.ts            IndexedDB „mosaic” – autozapis dokumentu i blobów zdjęć
-  serialize.ts     toSaved/restoreDoc – bezpieczne odtwarzanie (walidacja, SAVE_VERSION)
+  db.ts            IndexedDB „mosaic” (wersja 2) – autozapis dokumentu, serii (klucz „batch”),
+                   blobów zdjęć (store images) i miniatur zdjęć serii (store thumbs)
+  serialize.ts     toSaved/restoreDoc, toSavedBatch/restoreBatch – bezpieczne odtwarzanie (walidacja, SAVE_VERSION)
   project.ts       plik .mosaic: "MOSAICP1" + uint32 długość + JSON manifest + surowe pliki zdjęć
 src/hooks/
   useMosaic.ts     CAŁY stan aplikacji: historia (useReducer), mapa zdjęć id→{blob,url},
@@ -55,9 +60,14 @@ src/components/
   workspace/       Workspace (drop plików), SheetView, Cell (kadrowanie, zamiana), Divider (krawędź)
   NewProjectDialog.tsx  „Nowy projekt”: zapisać? → jako projekt / jako obraz
   FileNameDialog.tsx    pole „Nazwa pliku” + rozszerzenie, Enter/Escape
+  AutoCollageDialog.tsx „Kolaże z folderu” (z-60): folder, od–do, kolejność, układ, format, ramka; postęp
+  BatchPanel.tsx        prawy panel z miniaturami serii (canvas, drawMosaic na miniaturach zdjęć)
+  SeriesSaveDialog.tsx  „Zapisz wszystkie” (z-60): nazwa_001…, folder (showDirectoryPicker) albo ZIP
 src/App.tsx        układ strony, szuflada na telefonie (zakładki photos/options), eksport,
                    zapis projektu, okna dialogowe, preferencje dpi/exportType
-src/exporter.ts    eksport do pliku (DOM/canvas → blob → download)
+src/exporter.ts    eksport do pliku: renderMosaic (canvas → blob) + exportMosaic (download)
+src/autoCollage.ts seria po stronie przeglądarki: createSeries (EXIF, odczyt, miniatury, plan), saveSeries
+src/plural.ts      odmiana: photosWord, collagesWord
 src/download.ts    pobranie bloba przez <a download>
 src/prefs.ts       localStorage „mosaic.prefs” (loadPref/savePref)
 src/pwa.ts sw-template.js  instalacja, baner „Dostępna nowa wersja”; sw.js generuje vite.config.ts
@@ -70,9 +80,21 @@ Przyciski „Zapisz projekt” i „Zapisz Kolaż na Dysku” oraz opcje w `NewP
 
 Numeracja nazw: pierwsza podpowiedź to `kolaz_504x506mm`, potem ostatnia nazwa + dwucyfrowy numer (`wakacje` → `wakacje01` → `wakacje02`, po 99 jest 100). Dwie cyfry na końcu wpisane przez użytkownika liczą się jako licznik. Inne liczby (rok, wymiar) są częścią nazwy. Domyślna nazwa kończy się na „mm” właśnie dlatego, żeby wymiaru nie uznać za licznik.
 
+### Seria „Kolaże z folderu” (tylko komputer)
+
+Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPanel` tylko gdy `desktop`.
+
+- Każdy kolaż serii to zwykły `Doc` z polem `batchKey`. Seria to `Doc[]` w `useMosaic` (`batch`).
+- Edytowany kolaż żyje w `doc` (historia undo). `batch` jest liczony jako `writeBack(storedBatch, doc)`, więc panel zawsze pokazuje bieżący stan. Do `storedBatch` kolaż trafia (`keepBatch`) dopiero, gdy edytor przechodzi na coś innego: inny kolaż (`selectBatch`), nowy lub otwarty projekt. Dzięki temu Ctrl+Z przechodzi spójnie między kolażami.
+- Magazyn odłożonych należy do edytora, nie do kolażu: `selectBatch` przenosi go do otwieranego kolażu, a kopie w serii mają pusty magazyn (`batchCopy`).
+- Otwarty projekt `.mosaic` traci `batchKey` (to samodzielny kolaż).
+- Autozapis trzyma zdjęcia z `doc` ∪ wszystkich kolaży serii; miniatury zdjęć (240 px) osobno w store `thumbs`.
+- `planBatch`: programowanie dynamiczne po kolejnych zdjęciach; koszt kolażu = `layoutCost` (te same kryteria co Auto) × liczba zdjęć + lekka kara za nierówne rozmiary + duża kara za wyjście poza zakres (tylko gdy zakresu nie da się spełnić). Dla 500 zdjęć i zakresu 2–20 trwa ~4 s, dlatego jest async z `tick` (postęp, przerwanie).
+- E2E: `tests/e2e/series.spec.ts` – folder wybiera `setInputFiles(ASSETS)`, `showDirectoryPicker` jest podmieniany w `addInitScript`; `__mosaic.batch()` zwraca serię.
+
 ### Preferencje w localStorage (`mosaic.prefs`)
 
-`dpi`, `exportType`, `installDismissed`, `lastProjectName`, `lastImageName`.
+`dpi`, `exportType`, `installDismissed`, `lastProjectName`, `lastImageName`, `autoMin`, `autoMax`, `autoOrder`, `lastSeriesName`.
 
 ## Testy
 
