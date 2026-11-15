@@ -36,8 +36,8 @@ describe('exportSize', () => {
   });
 
   it('names the file after the sheet size', () => {
-    expect(exportFileName({ widthMm: 504, heightMm: 506 }, 'jpeg')).toBe('kolaz_504x506.jpg');
-    expect(exportFileName({ widthMm: 210, heightMm: 297 }, 'png')).toBe('kolaz_210x297.png');
+    expect(exportFileName({ widthMm: 504, heightMm: 506 }, 'jpeg')).toBe('kolaz_504x506mm.jpg');
+    expect(exportFileName({ widthMm: 210, heightMm: 297 }, 'png')).toBe('kolaz_210x297mm.png');
   });
 });
 

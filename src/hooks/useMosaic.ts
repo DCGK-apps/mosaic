@@ -91,9 +91,9 @@ export function useMosaic() {
   );
 
   /** Saves an editable project file (.mosaic) with the document and the original photos. */
-  const saveProject = useCallback(() => {
+  const saveProject = useCallback((name?: string) => {
     const current = docRef.current;
-    download(writeProject(current, (id) => images.current.get(id)?.blob), projectFileName(current));
+    download(writeProject(current, (id) => images.current.get(id)?.blob), projectFileName(current, name));
   }, []);
 
   /** Opens a project file in place of the current work. Throws ProjectError with a message for the user. */

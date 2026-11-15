@@ -1,17 +1,23 @@
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileNameDialog } from './components/FileNameDialog';
 import { NewProjectDialog } from './components/NewProjectDialog';
 import { AppIcon, Sidebar, UndoRedo, type PanelTab } from './components/sidebar/Sidebar';
 import { Workspace } from './components/workspace/Workspace';
 import { cx } from './components/cx';
-import { DEFAULT_DPI, DPI_OPTIONS, type ExportType } from './core/export';
+import { DEFAULT_DPI, defaultFileBase, DPI_OPTIONS, exportExt, type ExportType } from './core/export';
+import { rememberName, suggestName, type NameMemory } from './core/filename';
 import { exportMosaic } from './exporter';
 import { DESKTOP, useMediaQuery } from './hooks/useMediaQuery';
 import { useMosaic } from './hooks/useMosaic';
 import { useUndoShortcuts } from './hooks/useShortcuts';
-import { isProjectFile, ProjectError } from './storage/project';
+import { isProjectFile, PROJECT_EXT, ProjectError } from './storage/project';
 import { loadPref, savePref } from './prefs';
 import { toast } from './toast';
+
+type SaveKind = 'project' | 'image';
+/** Last file name per kind, remembered between sessions. */
+const nameKey = (kind: SaveKind) => (kind === 'project' ? 'lastProjectName' : 'lastImageName');
 
 const plural = (n: number) => (n === 1 ? 'zdjęcie' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'zdjęcia' : 'zdjęć');
 
@@ -28,6 +34,8 @@ export function App() {
   });
   const [exportType, setExportType] = useState<ExportType>(() => (loadPref<string>('exportType', 'jpeg') === 'png' ? 'png' : 'jpeg'));
   const [exporting, setExporting] = useState(false);
+  /** Open "file name" dialog: what is being saved and what to do after a successful save. */
+  const [saveAs, setSaveAs] = useState<{ kind: SaveKind; after?: () => void } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const projectInput = useRef<HTMLInputElement>(null);
 
@@ -63,10 +71,10 @@ export function App() {
   );
 
   /** Renders and downloads the collage image; false when it failed (the user was told). */
-  const onExport = async (): Promise<boolean> => {
+  const onExport = async (name: string): Promise<boolean> => {
     setExporting(true);
     try {
-      await exportMosaic(mosaic.doc, mosaic.urlOf, dpi, exportType);
+      await exportMosaic(mosaic.doc, mosaic.urlOf, dpi, exportType, name);
       return true;
     } catch {
       toast('Eksport nie powiódł się');
@@ -76,14 +84,28 @@ export function App() {
     }
   };
 
-  const onSaveProject = (): boolean => {
+  const onSaveProject = (name: string): boolean => {
     try {
-      mosaic.saveProject();
+      mosaic.saveProject(name);
       return true;
     } catch {
       toast('Nie udało się zapisać projektu');
       return false;
     }
+  };
+
+  const nameMemory = (kind: SaveKind) => {
+    const m = loadPref<NameMemory | null>(nameKey(kind), null);
+    return m && typeof m.base === 'string' && Number.isInteger(m.n) && m.n >= 0 ? m : null;
+  };
+
+  /** Saves under the name from the dialog; the name is remembered once the save worked. */
+  const onSaveAs = async (kind: SaveKind, name: string, then?: () => void) => {
+    setSaveAs(null);
+    const ok = kind === 'project' ? onSaveProject(name) : await onExport(name);
+    if (!ok) return;
+    savePref(nameKey(kind), rememberName(name, nameMemory(kind)));
+    then?.();
   };
 
   const startNewProject = () => {
@@ -155,8 +177,8 @@ export function App() {
             setExportType(t);
             savePref('exportType', t);
           }}
-          onExport={() => void onExport()}
-          onSaveProject={onSaveProject}
+          onExport={() => setSaveAs({ kind: 'image' })}
+          onSaveProject={() => setSaveAs({ kind: 'project' })}
           onOpenProject={() => projectInput.current?.click()}
           onNewProject={() => setNewDialog(true)}
           tab={tab}
@@ -197,14 +219,20 @@ export function App() {
           canExport={mosaic.doc.photos.length > 0}
           imageLabel={`${exportType === 'png' ? 'PNG' : 'JPG'} · ${dpi} DPI`}
           busy={exporting}
-          onSaveProject={() => {
-            if (onSaveProject()) startNewProject();
-          }}
-          onSaveImage={() => {
-            void onExport().then((ok) => ok && startNewProject());
-          }}
+          onSaveProject={() => setSaveAs({ kind: 'project', after: startNewProject })}
+          onSaveImage={() => setSaveAs({ kind: 'image', after: startNewProject })}
           onDiscard={startNewProject}
           onCancel={() => setNewDialog(false)}
+        />
+      )}
+
+      {saveAs && (
+        <FileNameDialog
+          title={saveAs.kind === 'project' ? 'Zapisz projekt' : 'Zapisz kolaż'}
+          initial={suggestName(nameMemory(saveAs.kind), defaultFileBase(mosaic.doc.sheet))}
+          ext={saveAs.kind === 'project' ? PROJECT_EXT : exportExt(exportType)}
+          onSave={(name) => void onSaveAs(saveAs.kind, name, saveAs.after)}
+          onCancel={() => setSaveAs(null)}
         />
       )}
 

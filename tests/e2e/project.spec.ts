@@ -1,8 +1,12 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 import { addPhotos, cells, getDoc, inPanel, openApp, shownPhotos, undoButton } from './fixtures';
 
 async function saveProject(page: Page) {
-  const [download] = await Promise.all([page.waitForEvent('download'), inPanel(page, () => page.getByTestId('project-save').click())]);
+  let download!: Download;
+  await inPanel(page, async () => {
+    await page.getByTestId('project-save').click();
+    [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('filename-save').click()]);
+  });
   return { name: download.suggestedFilename(), path: (await download.path())! };
 }
 
@@ -27,7 +31,7 @@ test('a saved project opens in a fresh browser with the same layout, crops, sett
   const order = await shownPhotos(page);
 
   const file = await saveProject(page);
-  expect(file.name).toBe('kolaz_504x506.mosaic');
+  expect(file.name).toBe('kolaz_504x506mm.mosaic');
 
   // A different browser profile: nothing autosaved, the photos only come from the file.
   const context = await browser.newContext(testInfo.project.use);
@@ -125,8 +129,9 @@ test('new project: save the current one as a project file first', async ({ page 
   const before = await getDoc(page);
   await newProject(page);
   await page.getByTestId('new-save-yes').click();
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('new-save-project').click()]);
-  expect(download.suggestedFilename()).toBe('kolaz_504x506.mosaic');
+  await page.getByTestId('new-save-project').click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('filename-save').click()]);
+  expect(download.suggestedFilename()).toBe('kolaz_504x506mm.mosaic');
   await expect(cells(page)).toHaveCount(0);
 
   // The saved file brings the old work back.
@@ -141,7 +146,8 @@ test('new project: save the current one as an image first', async ({ page }) => 
   await newProject(page);
   await page.getByTestId('new-save-yes').click();
   await expect(page.getByTestId('new-save-image')).toContainText('JPG · 150 DPI');
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('new-save-image').click()]);
+  await page.getByTestId('new-save-image').click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('filename-save').click()]);
   expect(download.suggestedFilename()).toMatch(/\.jpg$/);
   await expect(cells(page)).toHaveCount(0);
 });
@@ -159,4 +165,35 @@ test('on a computer "Nowy projekt" is also at the top of the panel', async ({ pa
   await page.getByTestId('header-new').click();
   await page.getByTestId('new-save-no').click();
   await expect(cells(page)).toHaveCount(0);
+});
+
+test('save asks for the file name and suggests the last one with the next number', async ({ page }) => {
+  await openApp(page);
+  await addPhotos(page, ['square']);
+  const saveAs = async (name?: string) => {
+    let download!: Download;
+    let suggested = '';
+    await inPanel(page, async () => {
+      await page.getByTestId('project-save').click();
+      const input = page.getByTestId('filename-input');
+      suggested = await input.inputValue();
+      if (name !== undefined) await input.fill(name);
+      [download] = await Promise.all([page.waitForEvent('download'), input.press('Enter')]);
+    });
+    return { suggested, file: download.suggestedFilename() };
+  };
+  expect(await saveAs('wakacje')).toEqual({ suggested: 'kolaz_504x506mm', file: 'wakacje.mosaic' });
+  expect(await saveAs()).toEqual({ suggested: 'wakacje01', file: 'wakacje01.mosaic' });
+  expect(await saveAs()).toEqual({ suggested: 'wakacje02', file: 'wakacje02.mosaic' });
+
+  // Remembered after a reload; Escape cancels without saving.
+  await page.evaluate(() => (window as any).__mosaic.flush());
+  await page.reload();
+  await expect(page.locator('body[data-ready="true"]')).toBeAttached();
+  await inPanel(page, async () => {
+    await page.getByTestId('project-save').click();
+    await expect(page.getByTestId('filename-input')).toHaveValue('wakacje03');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('filename-dialog')).toHaveCount(0);
+  });
 });

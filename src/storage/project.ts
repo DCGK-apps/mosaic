@@ -12,6 +12,7 @@
  * both writing and reading work on Blob slices, so big projects are not
  * copied around in memory.
  */
+import { defaultFileBase } from '../core/export';
 import type { Doc } from '../core/types';
 import { toSaved } from './serialize';
 
@@ -85,6 +86,6 @@ export async function readProject(file: Blob): Promise<{ saved: unknown; images:
   return { saved, images };
 }
 
-export function projectFileName(doc: Pick<Doc, 'sheet'>): string {
-  return `kolaz_${doc.sheet.widthMm}x${doc.sheet.heightMm}${PROJECT_EXT}`;
+export function projectFileName(doc: Pick<Doc, 'sheet'>, base = defaultFileBase(doc.sheet)): string {
+  return base + PROJECT_EXT;
 }
