@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { ASSETS, cells, getDoc, inPanel, openApp } from './fixtures';
+import { ASSETS, asset, cells, getDoc, inPanel, openApp } from './fixtures';
 
 const items = (page: Page) => page.getByTestId('batch-item');
 const getBatch = (page: Page): Promise<any[]> => page.evaluate(() => (window as any).__mosaic.batch());
@@ -43,6 +44,35 @@ test.describe('computer', () => {
     await expect(cells(page)).toHaveCount(batch[0].photos.length);
     await expect(items(page).first()).toHaveAttribute('aria-current', 'true');
     await expect(page.locator('[data-testid=batch-canvas][data-drawn=true]')).toHaveCount(2);
+  });
+
+  test('photos in subfolders are left out unless the user asks for them', async ({ page }) => {
+    const root = join(test.info().outputPath('pick'), 'Wakacje');
+    mkdirSync(join(root, 'Dzien2'), { recursive: true });
+    for (const n of ['landscape', 'portrait', 'square']) copyFileSync(asset(n), join(root, `${n}.jpg`));
+    for (const n of ['tall', 'wide']) copyFileSync(asset(n), join(root, 'Dzien2', `${n}.jpg`));
+
+    await page.getByTestId('auto-collage').click();
+    await expect(page.getByTestId('auto-subfolders')).not.toBeChecked();
+    await page.getByTestId('auto-folder-input').setInputFiles(root);
+    await expect(page.getByTestId('auto-folder-info')).toHaveText('Wakacje: 3 zdjęcia (+2 w podfolderach)');
+    await page.getByTestId('auto-min').fill('5');
+    await page.getByTestId('auto-max').fill('5');
+    await page.getByTestId('auto-create').click();
+    await expect(items(page)).toHaveCount(1);
+    expect((await getBatch(page))[0].photos.map((p: any) => p.name)).toEqual(['landscape.jpg', 'portrait.jpg', 'square.jpg']);
+
+    // With subfolders – and the choice is remembered.
+    await page.getByTestId('batch-hide').click();
+    await page.getByTestId('auto-collage').click();
+    await page.getByTestId('auto-subfolders').check();
+    await page.getByTestId('auto-folder-input').setInputFiles(root);
+    await expect(page.getByTestId('auto-folder-info')).toHaveText('Wakacje: 5 zdjęć');
+    await page.getByTestId('auto-create').click();
+    await expect(page.getByTestId('auto-dialog')).toBeHidden();
+    expect((await getBatch(page))[0].photos.length).toBe(5);
+    await page.getByTestId('auto-collage').click();
+    await expect(page.getByTestId('auto-subfolders')).toBeChecked();
   });
 
   test('a collage can be corrected; removed photos go to the magazine and into another collage', async ({ page }) => {

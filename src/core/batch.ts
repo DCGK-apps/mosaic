@@ -32,6 +32,15 @@ export interface FileInfo {
   modified: number;
 }
 
+/**
+ * True for a file directly in the chosen folder ("Wakacje/IMG_1.jpg"), false for
+ * one in a folder inside it ("Wakacje/2024/IMG_1.jpg"). The path starts with the
+ * chosen folder's name, as the browser gives it.
+ */
+export function inChosenFolder(path: string): boolean {
+  return path.split('/').length <= 2;
+}
+
 const natural = new Intl.Collator('pl', { numeric: true, sensitivity: 'base' });
 
 /**
