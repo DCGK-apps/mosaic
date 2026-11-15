@@ -1,25 +1,29 @@
 import { ImagePlus, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AutoCollageDialog } from './components/AutoCollageDialog';
+import { BatchPanel } from './components/BatchPanel';
 import { FileNameDialog } from './components/FileNameDialog';
+import { SeriesSaveDialog } from './components/SeriesSaveDialog';
 import { NewProjectDialog } from './components/NewProjectDialog';
 import { AppIcon, Sidebar, UndoRedo, type PanelTab } from './components/sidebar/Sidebar';
 import { Workspace } from './components/workspace/Workspace';
 import { cx } from './components/cx';
 import { DEFAULT_DPI, defaultFileBase, DPI_OPTIONS, exportExt, type ExportType } from './core/export';
 import { rememberName, suggestName, type NameMemory } from './core/filename';
+import type { SeriesResult } from './autoCollage';
 import { exportMosaic } from './exporter';
 import { DESKTOP, useMediaQuery } from './hooks/useMediaQuery';
 import { useMosaic } from './hooks/useMosaic';
 import { useUndoShortcuts } from './hooks/useShortcuts';
 import { isProjectFile, PROJECT_EXT, ProjectError } from './storage/project';
 import { loadPref, savePref } from './prefs';
+import { collagesWord, photosWord } from './plural';
 import { toast } from './toast';
 
 type SaveKind = 'project' | 'image';
 /** Last file name per kind, remembered between sessions. */
 const nameKey = (kind: SaveKind) => (kind === 'project' ? 'lastProjectName' : 'lastImageName');
 
-const plural = (n: number) => (n === 1 ? 'zdjęcie' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'zdjęcia' : 'zdjęć');
 
 export function App() {
   const mosaic = useMosaic();
@@ -36,6 +40,10 @@ export function App() {
   const [exporting, setExporting] = useState(false);
   /** Open "file name" dialog: what is being saved and what to do after a successful save. */
   const [saveAs, setSaveAs] = useState<{ kind: SaveKind; after?: () => void } | null>(null);
+  /** Computer only: the automatic series – its dialog, the "save all" dialog and the side panel. */
+  const [autoDialog, setAutoDialog] = useState(false);
+  const [seriesSave, setSeriesSave] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
   const projectInput = useRef<HTMLInputElement>(null);
 
@@ -64,7 +72,7 @@ export function App() {
       const project = files.find(isProjectFile);
       if (project) return onOpenProject(project);
       const n = await addFiles(files);
-      if (n > 0) toast(`Dodano ${n} ${plural(n)}`);
+      if (n > 0) toast(`Dodano ${n} ${photosWord(n)}`);
       else if (files.length > 0) toast('Nie udało się wczytać zdjęć');
     },
     [addFiles, onOpenProject],
@@ -115,6 +123,18 @@ export function App() {
     setSwapMode(false);
     toast('Nowy projekt');
   };
+
+  const onSeriesDone = (result: SeriesResult) => {
+    mosaic.startBatch(result.entries, result.docs);
+    setAutoDialog(false);
+    setBatchOpen(true);
+    setSwapMode(false);
+    const photos = result.docs.reduce((s, d) => s + d.photos.length, 0);
+    toast(`Utworzono ${result.docs.length} ${collagesWord(result.docs.length)} z ${photos} ${photosWord(photos)}${result.skipped ? ` (pominięto ${result.skipped})` : ''}`);
+  };
+
+  /** The collages to save: the edited one as it is now, empty ones left out. */
+  const seriesDocs = () => mosaic.batch.map((d) => (d.batchKey === mosaic.doc.batchKey ? mosaic.doc : d)).filter((d) => d.photos.length > 0);
 
   const openDrawer = (t: PanelTab) => {
     setTab(t);
@@ -181,6 +201,7 @@ export function App() {
           onSaveProject={() => setSaveAs({ kind: 'project' })}
           onOpenProject={() => projectInput.current?.click()}
           onNewProject={() => setNewDialog(true)}
+          onAutoCollage={desktop ? () => setAutoDialog(true) : undefined}
           tab={tab}
           onTab={setTab}
           onClose={() => setDrawerOpen(false)}
@@ -236,7 +257,33 @@ export function App() {
         />
       )}
 
+      {desktop && autoDialog && (
+        <AutoCollageDialog sheet={mosaic.doc.sheet} mode={mosaic.doc.mode} existing={mosaic.batch.length} onDone={onSeriesDone} onCancel={() => setAutoDialog(false)} />
+      )}
+
+      {desktop && seriesSave && (
+        <SeriesSaveDialog
+          docs={seriesDocs()}
+          urlOf={mosaic.urlOf}
+          dpi={dpi}
+          type={exportType}
+          onDpi={(d) => {
+            setDpi(d);
+            savePref('dpi', d);
+          }}
+          onType={(t) => {
+            setExportType(t);
+            savePref('exportType', t);
+          }}
+          onClose={() => setSeriesSave(false)}
+        />
+      )}
+
       <Workspace mosaic={mosaic} swapMode={swapMode} onFiles={(f) => void onFiles(f)} />
+
+      {desktop && mosaic.batch.length > 0 && (
+        <BatchPanel mosaic={mosaic} open={batchOpen} onOpen={setBatchOpen} onSaveAll={() => setSeriesSave(true)} onNewSeries={() => setAutoDialog(true)} />
+      )}
     </div>
   );
 }

@@ -165,6 +165,41 @@ export function autoLayout(photos: Photo[], size: Size, rng: Rng, attempts = 250
   return best;
 }
 
+/**
+ * How badly a layout fits its photos (0 = perfect, larger = worse): uneven cell
+ * areas and photos squeezed into cells of other proportions. The same criteria
+ * as the auto layout uses, averaged per photo so collages of different sizes compare.
+ */
+export function layoutCost(tree: Node | null, photos: Photo[], size: Size): number {
+  if (!tree || photos.length === 0) return 0;
+  const byId = new Map(photos.map((p) => [p.id, p]));
+  const cells: { photo: Photo | undefined; w: number; h: number }[] = [];
+  const measure = (n: Node, w: number, h: number): void => {
+    if (n.kind === 'leaf') cells.push({ photo: byId.get(n.photoId), w, h });
+    else if (n.dir === 'V') {
+      measure(n.a, w * n.frac, h);
+      measure(n.b, w * (1 - n.frac), h);
+    } else {
+      measure(n.a, w, h * n.frac);
+      measure(n.b, w, h * (1 - n.frac));
+    }
+  };
+  measure(tree, size.widthMm, size.heightMm);
+  let maxDistortion = 0;
+  let sumDistortion = 0;
+  for (const c of cells) {
+    const cellAr = c.h > 0 ? c.w / c.h : 1;
+    const ar = c.photo ? aspect(c.photo) : cellAr;
+    const distortion = Math.max(cellAr / ar, ar / cellAr) - 1;
+    maxDistortion = Math.max(maxDistortion, distortion);
+    sumDistortion += distortion;
+  }
+  const mean = (size.widthMm * size.heightMm) / cells.length;
+  const variance = cells.reduce((s, c) => s + (c.w * c.h - mean) ** 2, 0) / cells.length;
+  const areaCv = mean > 0 ? Math.sqrt(variance) / mean : 0;
+  return areaCv * 3000 + (sumDistortion / cells.length) * 500 + Math.max(0, maxDistortion - 0.25) * 10000;
+}
+
 /** Layout for one of the fixed modes. */
 export function fixedLayout(mode: Exclude<LayoutMode, 'auto'>, photos: Photo[], rng: Rng): Node | null {
   const id = idGen(rng);

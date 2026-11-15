@@ -73,6 +73,11 @@ export interface Doc {
   /** Layouts drawn in the auto mode – the user can browse them. */
   autoHistory: Node[];
   autoIndex: number;
+  /**
+   * Set on the collages of an automatic series ("Kolaże z folderu"): which
+   * collage of the series this document is, so edits go back to it.
+   */
+  batchKey?: string;
 }
 
 export interface Rect {

@@ -15,6 +15,7 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 - **Projekt do dalszej edycji:** „Zapisz projekt” tworzy plik `.mosaic` (oryginalne zdjęcia, układ, kadry, ustawienia arkusza i magazyn). „Otwórz projekt” – albo przeciągnięcie pliku `.mosaic` na płótno – przywraca kolaż do edycji, także na innym urządzeniu; otwarcie można cofnąć.
 - **Nazwa pliku przy zapisie:** przed zapisem projektu lub obrazu można podać nazwę pliku. Program pamięta ostatnią i następnym razem podpowiada ją z kolejnym numerem (`wakacje` → `wakacje01` → `wakacje02`).
 - **Nowy projekt:** czyści arkusz (format i styl zostają). Najpierw pyta, czy zapisać obecną pracę – jako projekt `.mosaic` albo jako obraz (JPG/PNG w wybranej jakości). Można to cofnąć.
+- **Kolaże z folderu** (tylko na komputerze): wskazujesz folder ze zdjęciami (do 500), liczbę zdjęć w kolażu „od – do”, kolejność (data wykonania z EXIF albo nazwa pliku), układ, format i ramkę. Program dzieli wszystkie zdjęcia po kolei na kolaże i sam dobiera liczbę zdjęć w każdym z podanego zakresu tak, żeby najlepiej pasowały do układu. Kolaże widać jako miniatury w wysuwanym panelu po prawej. Kliknięty kolaż można poprawiać jak każdy inny. Zdjęcie usunięte z kolażu trafia do magazynu odłożonych, a stamtąd można je dodać do innego kolażu serii. „Zapisz wszystkie” zapisuje serię jako `nazwa_001.jpg`, `nazwa_002.jpg`… w wybranym folderze (Chrome, Edge) albo w jednym pliku ZIP (inne przeglądarki). Seria zapisuje się automatycznie w przeglądarce i wraca po odświeżeniu.
 - **Cofnij / Ponów** (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y).
 - **Automatyczny zapis** w przeglądarce (IndexedDB): zdjęcia, układ i kadry wracają po odświeżeniu.
 - **Dodawanie zdjęć** przyciskiem lub przeciągnięciem plików na płótno.
@@ -55,6 +56,9 @@ src/
     doc.ts       reducer dokumentu (wszystkie zmiany stanu)
     history.ts   cofnij/ponów, przeciąganie = jeden krok
     export.ts    rysowanie na canvasie, rozdzielczość, limity przeglądarek
+    batch.ts     seria „Kolaże z folderu”: kolejność, podział na kolaże, nazwy plików
+    exif.ts      data wykonania zdjęcia z EXIF
+    zip.ts       prosty zapis ZIP (seria w przeglądarkach bez wyboru folderu)
     formats.ts   formaty papieru
   storage/     zapis w IndexedDB, plik projektu .mosaic i bezpieczne odtwarzanie danych
   hooks/       useMosaic (stan + historia + autozapis), skróty, rozmiar elementu
@@ -63,6 +67,7 @@ src/
     workspace/   płótno: arkusz, pole ze zdjęciem, krawędź
   App.tsx      układ strony (panel / szuflada na telefonie)
   exporter.ts  eksport do pliku (DOM)
+  autoCollage.ts  seria: wczytanie folderu, zapis wszystkich kolaży (folder / ZIP)
   pwa.ts       instalacja i komunikat „Dostępna nowa wersja”
 tests/
   unit/        Vitest

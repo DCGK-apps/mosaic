@@ -15,7 +15,7 @@ import type { LayoutMode } from '../../core/types';
 import { cx } from '../cx';
 import { SectionTitle } from './ui';
 
-const MODES: { mode: LayoutMode; label: string; Icon: LucideIcon }[] = [
+export const MODES: { mode: LayoutMode; label: string; Icon: LucideIcon }[] = [
   { mode: 'auto', label: 'AUTO', Icon: Grid },
   { mode: 'grid', label: 'SIATKA', Icon: LayoutGrid },
   { mode: 'central', label: 'CENTRALNY', Icon: Target },

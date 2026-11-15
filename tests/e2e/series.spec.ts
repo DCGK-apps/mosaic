@@ -1,0 +1,165 @@
+import { readFileSync } from 'node:fs';
+import { expect, test, type Page } from '@playwright/test';
+import { ASSETS, cells, getDoc, inPanel, openApp } from './fixtures';
+
+const items = (page: Page) => page.getByTestId('batch-item');
+const getBatch = (page: Page): Promise<any[]> => page.evaluate(() => (window as any).__mosaic.batch());
+
+/** Makes a series from the five test photos, 2–3 per collage, in a grid. */
+async function createSeries(page: Page) {
+  await page.getByTestId('auto-collage').click();
+  const dialog = page.getByTestId('auto-dialog');
+  await page.getByTestId('auto-folder-input').setInputFiles(ASSETS);
+  await expect(page.getByTestId('auto-folder-info')).toContainText('5 zdjęć');
+  await page.getByTestId('auto-min').fill('2');
+  await page.getByTestId('auto-max').fill('3');
+  await page.getByTestId('auto-order-name').click();
+  await page.getByTestId('auto-mode-grid').click();
+  await dialog.getByTestId('gap').fill('3');
+  await expect(page.getByTestId('auto-estimate')).toContainText('2 kolaże');
+  await page.getByTestId('auto-create').click();
+  await expect(dialog).toBeHidden();
+  await expect(items(page)).toHaveCount(2);
+}
+
+test.describe('computer', () => {
+  test.beforeEach(async ({ page }, info) => {
+    test.skip(!!info.project.use.isMobile, 'computer only');
+    await openApp(page);
+  });
+
+  test('makes a series of collages from a folder, using every photo in order', async ({ page }) => {
+    await createSeries(page);
+    const batch = await getBatch(page);
+    const names = batch.flatMap((d) => d.photos.map((p: any) => p.name));
+    expect(names).toEqual(['landscape.jpg', 'portrait.jpg', 'square.jpg', 'tall.jpg', 'wide.jpg']);
+    for (const d of batch) {
+      expect(d.photos.length).toBeGreaterThanOrEqual(2);
+      expect(d.photos.length).toBeLessThanOrEqual(3);
+      expect(d.mode).toBe('grid');
+      expect(d.sheet.gapMm).toBe(3);
+    }
+    // The first collage is on the sheet, its thumbnail is marked and drawn.
+    await expect(cells(page)).toHaveCount(batch[0].photos.length);
+    await expect(items(page).first()).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-testid=batch-canvas][data-drawn=true]')).toHaveCount(2);
+  });
+
+  test('a collage can be corrected; removed photos go to the magazine and into another collage', async ({ page }) => {
+    await createSeries(page);
+    const [first, second] = await getBatch(page);
+
+    await items(page).nth(1).click();
+    await expect(items(page).nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(cells(page)).toHaveCount(second.photos.length);
+    expect((await getDoc(page)).batchKey).toBe(second.batchKey);
+
+    const cell = cells(page).first();
+    await cell.hover();
+    await cell.getByTestId('cell-remove').click();
+    await expect(cells(page)).toHaveCount(second.photos.length - 1);
+    await expect(page.getByTestId('magazine-item')).toHaveCount(1);
+    await expect(items(page).nth(1)).toContainText(`${second.photos.length - 1} zdj.`);
+
+    // Back to the first collage: the magazine stays, its photo can join this collage.
+    await items(page).first().click();
+    await expect(cells(page)).toHaveCount(first.photos.length);
+    await page.getByTestId('magazine-item').hover();
+    await page.getByTestId('magazine-restore').click();
+    await expect(cells(page)).toHaveCount(first.photos.length + 1);
+
+    const batch = await getBatch(page);
+    expect(batch[0].photos.length).toBe(first.photos.length + 1);
+    expect(batch[1].photos.length).toBe(second.photos.length - 1);
+
+    // Undo goes back through the switch between collages.
+    await page.keyboard.press('Control+z');
+    await expect(cells(page)).toHaveCount(first.photos.length);
+    await page.keyboard.press('Control+z');
+    await expect(items(page).nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(cells(page)).toHaveCount(second.photos.length - 1);
+  });
+
+  test('saves all collages into a chosen folder as name_001, name_002…', async ({ page }) => {
+    await page.addInitScript(() => {
+      const written: Record<string, number> = { 'wakacje_002.jpg': 1 };
+      (window as any).__written = written;
+      (window as any).showDirectoryPicker = async () => ({
+        name: 'Kolaże',
+        getFileHandle: async (name: string, opts?: { create?: boolean }) => {
+          if (!(name in written) && !opts?.create) throw new DOMException('missing', 'NotFoundError');
+          return {
+            createWritable: async () => ({
+              write: async (blob: Blob) => void (written[name] = blob.size),
+              close: async () => undefined,
+            }),
+          };
+        },
+      });
+    });
+    await page.reload();
+    await createSeries(page);
+    await page.getByTestId('batch-save-all').click();
+    await page.getByTestId('series-name').fill('wakacje');
+    await expect(page.getByTestId('series-names')).toHaveText('wakacje_001.jpg … wakacje_002.jpg');
+    await page.getByTestId('series-save').click();
+    // wakacje_002.jpg is already there – ask before replacing it.
+    await expect(page.getByTestId('series-overwrite')).toContainText('wakacje_002.jpg');
+    await page.getByTestId('series-overwrite-yes').click();
+    await expect(page.getByTestId('series-save-dialog')).toBeHidden();
+    const written = await page.evaluate(() => (window as any).__written);
+    expect(Object.keys(written).toSorted()).toEqual(['wakacje_001.jpg', 'wakacje_002.jpg']);
+    expect(written['wakacje_001.jpg']).toBeGreaterThan(1000);
+    expect(written['wakacje_002.jpg']).toBeGreaterThan(1000);
+  });
+
+  test('without folder access the series is saved as one ZIP file', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).showDirectoryPicker = undefined;
+    });
+    await page.reload();
+    await createSeries(page);
+    await page.getByTestId('batch-save-all').click();
+    await page.getByTestId('series-name').fill('lato');
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('series-save').click()]);
+    expect(download.suggestedFilename()).toBe('lato.zip');
+    const zip = readFileSync(await download.path());
+    const end = zip.length - 22;
+    expect(zip.readUInt32LE(end)).toBe(0x06054b50);
+    expect(zip.readUInt16LE(end + 10)).toBe(2);
+    expect(zip.includes(Buffer.from('lato_001.jpg'))).toBe(true);
+    expect(zip.includes(Buffer.from('lato_002.jpg'))).toBe(true);
+  });
+
+  test('the series comes back after reloading the page, and can be closed', async ({ page }) => {
+    await createSeries(page);
+    await items(page).nth(1).click();
+    await page.evaluate(() => (window as any).__mosaic.flush());
+    const before = await getBatch(page);
+
+    await page.reload();
+    await expect(page.locator('body[data-ready="true"]')).toBeAttached();
+    await expect(items(page)).toHaveCount(2);
+    expect(await getBatch(page)).toEqual(before);
+    await expect(items(page).nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-testid=batch-canvas][data-drawn=true]')).toHaveCount(2);
+
+    // The panel hides to a narrow strip and comes back.
+    await page.getByTestId('batch-hide').click();
+    await expect(page.getByTestId('batch-panel')).toBeHidden();
+    await page.getByTestId('batch-toggle').click();
+    await expect(page.getByTestId('batch-panel')).toBeVisible();
+
+    await page.getByTestId('batch-close').click();
+    await page.getByTestId('batch-close-yes').click();
+    await expect(page.getByTestId('batch-panel')).toBeHidden();
+    // The collage on the sheet stays.
+    await expect(cells(page)).toHaveCount(before[1].photos.length);
+  });
+});
+
+test('on a phone there is no automatic series', async ({ page }, info) => {
+  test.skip(!info.project.use.isMobile, 'phone layout');
+  await openApp(page);
+  await inPanel(page, () => expect(page.getByTestId('auto-collage')).toHaveCount(0), 'photos');
+});

@@ -54,3 +54,28 @@ describe('MosaicDb', () => {
     db.close();
   });
 });
+
+describe('series storage', () => {
+  it('round-trips the collages of a series, dropping broken and empty ones', async () => {
+    const { buildBatch } = await import('../../src/core/batch');
+    const { restoreBatch, toSavedBatch } = await import('../../src/storage/serialize');
+    const docs = buildBatch([photo('a'), photo('b'), photo('c')], [2, 1], { mode: 'auto', sheet: emptyDoc().sheet }, 4);
+    const raw = JSON.parse(JSON.stringify(toSavedBatch(docs)));
+    expect(restoreBatch(raw, () => true)).toEqual(docs);
+    expect(restoreBatch(raw, (id) => id !== 'c').length).toBe(1);
+    expect(restoreBatch({ version: 99, docs: [] }, () => true)).toEqual([]);
+    expect(restoreBatch(undefined, () => true)).toEqual([]);
+  });
+
+  it('keeps the series and photo previews in the database', async () => {
+    const db = await MosaicDb.open(`test-${Math.random()}`);
+    expect(await db.loadBatch()).toBeUndefined();
+    await db.saveBatch({ version: 1, docs: [] });
+    expect(await db.loadBatch()).toEqual({ version: 1, docs: [] });
+    await db.putThumb('a', new Blob(['t']));
+    await db.putThumb('b', new Blob(['tt']));
+    await db.deleteThumbs(['a']);
+    expect([...(await db.loadThumbs()).keys()]).toEqual(['b']);
+    db.close();
+  });
+});
