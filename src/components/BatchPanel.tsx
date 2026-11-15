@@ -4,6 +4,7 @@ import { currentTree } from '../core/doc';
 import { drawMosaic } from '../core/export';
 import type { Doc } from '../core/types';
 import type { Mosaic } from '../hooks/useMosaic';
+import { loadFonts } from '../fonts';
 import { loadImage } from '../images';
 import { cx } from './cx';
 
@@ -32,6 +33,7 @@ function CollageThumb({ doc, thumbOf }: { doc: Doc; thumbOf: (id: string) => str
     const run = { cancelled: false };
     void (async () => {
       const images = new Map<string, HTMLImageElement>();
+      await loadFonts(doc.texts ?? []);
       await Promise.all(
         doc.photos.map(async (p) => {
           const url = thumbOf(p.id);
@@ -49,7 +51,7 @@ function CollageThumb({ doc, thumbOf }: { doc: Doc; thumbOf: (id: string) => str
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       c.width = Math.round(THUMB_W * dpr);
       c.height = Math.round(THUMB_W * ratio * dpr);
-      drawMosaic(ctx, { tree: currentTree(doc), sheet: doc.sheet, photos: doc.photos }, images, c.width / doc.sheet.widthMm);
+      drawMosaic(ctx, { tree: currentTree(doc), sheet: doc.sheet, photos: doc.photos, texts: doc.texts }, images, c.width / doc.sheet.widthMm);
       c.dataset.drawn = 'true';
     })();
     return () => {

@@ -1,6 +1,7 @@
 import { clampSide } from './formats';
 import { autoLayout, fixedLayout } from './layouts';
 import { createRng } from './random';
+import { cleanText, type TextBox } from './text';
 import { leaves, removePhoto, setFrac, swapLeaves } from './tree';
 import type { Crop, Doc, LayoutMode, Node, Photo, Sheet } from './types';
 
@@ -30,7 +31,10 @@ export type DocAction =
   | { type: 'swap'; leafA: string; leafB: string }
   | { type: 'setCrop'; photoId: string; crop: Crop }
   | { type: 'setSheet'; patch: Partial<Sheet> }
-  | { type: 'rotateSheet' };
+  | { type: 'rotateSheet' }
+  | { type: 'addText'; box: TextBox }
+  | { type: 'updateText'; id: string; patch: Partial<Omit<TextBox, 'id'>> }
+  | { type: 'deleteText'; id: string };
 
 function withTree(doc: Doc, tree: Node | null): Doc {
   if (doc.mode !== 'auto') return { ...doc, tree };
@@ -144,5 +148,22 @@ export function docReducer(doc: Doc, action: DocAction): Doc {
 
     case 'rotateSheet':
       return { ...doc, sheet: { ...doc.sheet, widthMm: doc.sheet.heightMm, heightMm: doc.sheet.widthMm } };
+
+    case 'addText':
+      return { ...doc, texts: [...(doc.texts ?? []), cleanText(action.box)] };
+
+    case 'updateText': {
+      const texts = doc.texts ?? [];
+      const old = texts.find((t) => t.id === action.id);
+      if (!old) return doc;
+      const next = cleanText({ ...old, ...action.patch, id: old.id });
+      if ((Object.keys(next) as (keyof TextBox)[]).every((k) => next[k] === old[k])) return doc;
+      return { ...doc, texts: texts.map((t) => (t === old ? next : t)) };
+    }
+
+    case 'deleteText': {
+      const texts = doc.texts ?? [];
+      return texts.some((t) => t.id === action.id) ? { ...doc, texts: texts.filter((t) => t.id !== action.id) } : doc;
+    }
   }
 }

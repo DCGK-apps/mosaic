@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { currentTree } from '../../core/doc';
 import { computeLayout } from '../../core/geometry';
+import { layoutText, type TextBox } from '../../core/text';
 import type { Crop } from '../../core/types';
+import { loadFonts, useTextMeasure } from '../../fonts';
 import type { Mosaic } from '../../hooks/useMosaic';
 import { Cell } from './Cell';
 import { Divider } from './Divider';
+import { TextFrame, TextItem } from './TextItem';
 
 interface Props {
   mosaic: Mosaic;
@@ -12,6 +15,10 @@ interface Props {
   width: number;
   height: number;
   swapMode: boolean;
+  selectedText: string | null;
+  onSelectText: (id: string | null) => void;
+  /** Double click on a caption – edit its text. */
+  onEditText: (id: string) => void;
 }
 
 interface SwapDrag {
@@ -21,10 +28,13 @@ interface SwapDrag {
   over: string | null;
 }
 
+/** An empty caption is shown with a placeholder, so it can still be found and moved. */
+const shown = (t: TextBox): TextBox => (t.text.trim() ? t : { ...t, text: 'Napis' });
+
 const leafAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-leaf-id]')?.dataset.leafId ?? null;
 
 /** The sheet as on paper: every position comes from computeLayout(), the same as in the exported file. */
-export function SheetView({ mosaic, width, height, swapMode }: Props) {
+export function SheetView({ mosaic, width, height, swapMode, selectedText, onSelectText, onEditText }: Props) {
   const { doc, act, endGesture, urlOf } = mosaic;
   const { sheet } = doc;
   const scale = Math.max(0, Math.min(width / sheet.widthMm, height / sheet.heightMm));
@@ -32,6 +42,17 @@ export function SheetView({ mosaic, width, height, swapMode }: Props) {
   const layout = useMemo(() => computeLayout(tree, sheet), [tree, sheet]);
   const photos = useMemo(() => new Map(doc.photos.map((p) => [p.id, p])), [doc.photos]);
   const [active, setActive] = useState<string | null>(null);
+  const texts = useMemo(() => doc.texts ?? [], [doc.texts]);
+  const measure = useTextMeasure();
+  useEffect(() => {
+    void loadFonts(texts);
+  }, [texts]);
+  const textLayouts = useMemo(() => new Map(texts.map((t) => [t.id, layoutText(shown(t), sheet, measure)])), [texts, sheet, measure]);
+  const onTextChange = useCallback(
+    (id: string, patch: Partial<Omit<TextBox, 'id'>>, transient: boolean) => act({ type: 'updateText', id, patch }, { transient }),
+    [act],
+  );
+  const selected = texts.find((t) => t.id === selectedText);
   const [drag, setDrag] = useState<SwapDrag | null>(null);
 
   // Swapping by dragging one photo onto another – pointer events, so it works with a finger too.
@@ -77,6 +98,7 @@ export function SheetView({ mosaic, width, height, swapMode }: Props) {
       style={{ width: sheet.widthMm * scale, height: sheet.heightMm * scale, backgroundColor: sheet.frameColor }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) setActive(null);
+        if (!(e.target as HTMLElement).closest('[data-testid=text-box],[data-testid=text-frame]')) onSelectText(null);
       }}
     >
       {layout.cells.map((cell) => {
@@ -103,6 +125,28 @@ export function SheetView({ mosaic, width, height, swapMode }: Props) {
         );
       })}
       {!swapMode && layout.dividers.map((d) => <Divider key={d.splitId} divider={d} scale={scale} onMove={onFrac} onEnd={endGesture} />)}
+      {texts.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" data-testid="text-layer">
+          {texts.map((t) => (
+            <TextItem
+              key={t.id}
+              box={t}
+              layout={textLayouts.get(t.id)!}
+              filled={!!t.text.trim()}
+              sheet={sheet}
+              scale={scale}
+              selected={t.id === selectedText}
+              onSelect={onSelectText}
+              onChange={onTextChange}
+              onEnd={endGesture}
+              onEdit={onEditText}
+            />
+          ))}
+        </div>
+      )}
+      {selected && textLayouts.get(selected.id) && (
+        <TextFrame box={selected} layout={textLayouts.get(selected.id)!} scale={scale} onChange={onTextChange} onEnd={endGesture} />
+      )}
       {drag && dragPhoto && (
         <img
           src={urlOf(dragPhoto.photoId)}
