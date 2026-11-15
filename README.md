@@ -13,6 +13,7 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 - **Wymiary:** gotowe formaty (A4, A3, 30 × 40 cm…) lub własne, obrót pion/poziom; ramka i zaokrąglenie w milimetrach wydruku.
 - **Eksport** do JPG/PNG w 100/150/300 DPI. Plik wygląda dokładnie jak podgląd (ta sama geometria).
 - **Projekt do dalszej edycji:** „Zapisz projekt” tworzy plik `.mosaic` (oryginalne zdjęcia, układ, kadry, ustawienia arkusza i magazyn). „Otwórz projekt” – albo przeciągnięcie pliku `.mosaic` na płótno – przywraca kolaż do edycji, także na innym urządzeniu; otwarcie można cofnąć.
+- **Nazwa pliku przy zapisie:** przed zapisem projektu lub obrazu można podać nazwę pliku. Program pamięta ostatnią i następnym razem podpowiada ją z kolejnym numerem (`wakacje` → `wakacje01` → `wakacje02`).
 - **Nowy projekt:** czyści arkusz (format i styl zostają). Najpierw pyta, czy zapisać obecną pracę – jako projekt `.mosaic` albo jako obraz (JPG/PNG w wybranej jakości). Można to cofnąć.
 - **Cofnij / Ponów** (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y).
 - **Automatyczny zapis** w przeglądarce (IndexedDB): zdjęcia, układ i kadry wracają po odświeżeniu.
