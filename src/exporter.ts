@@ -1,7 +1,7 @@
 import { drawMosaic, exportFileName, exportSize, MAX_PIXELS, MAX_PIXELS_IOS, type ExportType } from './core/export';
 import { currentTree } from './core/doc';
 import type { Doc } from './core/types';
-import { download } from './download';
+import { download, type SaveTarget } from './download';
 import { loadImage } from './images';
 import { isIos } from './pwa';
 
@@ -54,6 +54,8 @@ export async function renderMosaic(doc: Doc, urlOf: (photoId: string) => string 
 }
 
 /** Renders the mosaic to an image file and lets the browser download it. */
-export async function exportMosaic(doc: Doc, urlOf: (photoId: string) => string | undefined, dpi: number, type: ExportType, name?: string): Promise<void> {
-  download(await renderMosaic(doc, urlOf, dpi, type), exportFileName(doc.sheet, type, name));
+export async function exportMosaic(doc: Doc, urlOf: (photoId: string) => string | undefined, dpi: number, type: ExportType, name?: string, target?: SaveTarget): Promise<void> {
+  const blob = await renderMosaic(doc, urlOf, dpi, type);
+  if (target) await target.write(blob);
+  else download(blob, exportFileName(doc.sheet, type, name));
 }

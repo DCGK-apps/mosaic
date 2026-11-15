@@ -78,6 +78,8 @@ src/toast.ts       krótki komunikat na górze ekranu
 
 Przyciski „Zapisz projekt” i „Zapisz Kolaż na Dysku” oraz opcje w `NewProjectDialog` nie zapisują od razu. Ustawiają w `App.tsx` stan `saveAs = { kind: 'project' | 'image', after? }`, a ten otwiera `FileNameDialog`. Po zatwierdzeniu `onSaveAs` zapisuje plik (`mosaic.saveProject(name)` albo `exportMosaic(..., name)`). Dopiero gdy zapis się uda, zapamiętuje nazwę w prefs (`lastProjectName` / `lastImageName`, osobno dla projektów i obrazów) i wywołuje `after` (np. startNewProject).
 
+„Zapisz w…” (`filename-save-to`, tylko gdy `canChooseLocation()` – Chrome/Edge na komputerze): `onSaveAs(..., chooseFolder=true)` najpierw otwiera `chooseLocation` (`showSaveFilePicker`, `id` = `mosaic-image` / `mosaic-project`, więc przeglądarka pamięta folder osobno dla obrazów i projektów). Zamknięcie okna zostawia `FileNameDialog` otwarty. Zapamiętywana jest nazwa wybrana w oknie systemu. `exportMosaic` i `saveProject` przyjmują opcjonalny `SaveTarget`. E2E: `tests/e2e/save-to.spec.ts` (podmieniony `showSaveFilePicker`).
+
 Numeracja nazw: pierwsza podpowiedź to `kolaz_504x506mm`, potem ostatnia nazwa + dwucyfrowy numer (`wakacje` → `wakacje01` → `wakacje02`, po 99 jest 100). Dwie cyfry na końcu wpisane przez użytkownika liczą się jako licznik. Inne liczby (rok, wymiar) są częścią nazwy. Domyślna nazwa kończy się na „mm” właśnie dlatego, żeby wymiaru nie uznać za licznik.
 
 ### Seria „Kolaże z folderu” (tylko komputer)
