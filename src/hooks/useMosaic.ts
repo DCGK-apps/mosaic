@@ -6,7 +6,7 @@ import { canRedo, canUndo, commit, createHistory, end, preview, redo, undo, type
 import { randomSeed } from '../core/random';
 import type { Doc, Photo } from '../core/types';
 import { isImageFile, readImage, type ImageEntry } from '../images';
-import { download } from '../download';
+import { download, type SaveTarget } from '../download';
 import { MosaicDb } from '../storage/db';
 import { ProjectError, projectFileName, readProject, writeProject } from '../storage/project';
 import { restoreBatch, restoreDoc, toSaved, toSavedBatch } from '../storage/serialize';
@@ -106,9 +106,11 @@ export function useMosaic() {
   );
 
   /** Saves an editable project file (.mosaic) with the document and the original photos. */
-  const saveProject = useCallback((name?: string) => {
+  const saveProject = useCallback(async (name?: string, target?: SaveTarget) => {
     const current = docRef.current;
-    download(writeProject(current, (id) => images.current.get(id)?.blob), projectFileName(current, name));
+    const blob = writeProject(current, (id) => images.current.get(id)?.blob);
+    if (target) await target.write(blob);
+    else download(blob, projectFileName(current, name));
   }, []);
 
   /** Opens a project file in place of the current work. Throws ProjectError with a message for the user. */

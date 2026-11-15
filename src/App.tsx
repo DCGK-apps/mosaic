@@ -9,7 +9,8 @@ import { AppIcon, Sidebar, UndoRedo, type PanelTab } from './components/sidebar/
 import { Workspace } from './components/workspace/Workspace';
 import { cx } from './components/cx';
 import { DEFAULT_DPI, defaultFileBase, DPI_OPTIONS, exportExt, type ExportType } from './core/export';
-import { rememberName, suggestName, type NameMemory } from './core/filename';
+import { cleanName, rememberName, suggestName, type NameMemory } from './core/filename';
+import { canChooseLocation, chooseLocation, type SaveTarget } from './download';
 import type { SeriesResult } from './autoCollage';
 import { exportMosaic } from './exporter';
 import { DESKTOP, useMediaQuery } from './hooks/useMediaQuery';
@@ -79,10 +80,10 @@ export function App() {
   );
 
   /** Renders and downloads the collage image; false when it failed (the user was told). */
-  const onExport = async (name: string): Promise<boolean> => {
+  const onExport = async (name: string, target?: SaveTarget): Promise<boolean> => {
     setExporting(true);
     try {
-      await exportMosaic(mosaic.doc, mosaic.urlOf, dpi, exportType, name);
+      await exportMosaic(mosaic.doc, mosaic.urlOf, dpi, exportType, name, target);
       return true;
     } catch {
       toast('Eksport nie powiódł się');
@@ -92,9 +93,9 @@ export function App() {
     }
   };
 
-  const onSaveProject = (name: string): boolean => {
+  const onSaveProject = async (name: string, target?: SaveTarget): Promise<boolean> => {
     try {
-      mosaic.saveProject(name);
+      await mosaic.saveProject(name, target);
       return true;
     } catch {
       toast('Nie udało się zapisać projektu');
@@ -107,12 +108,33 @@ export function App() {
     return m && typeof m.base === 'string' && Number.isInteger(m.n) && m.n >= 0 ? m : null;
   };
 
-  /** Saves under the name from the dialog; the name is remembered once the save worked. */
-  const onSaveAs = async (kind: SaveKind, name: string, then?: () => void) => {
+  const saveExt = (kind: SaveKind) => (kind === 'project' ? PROJECT_EXT : exportExt(exportType));
+
+  /**
+   * Saves under the name from the dialog; the name is remembered once the save worked.
+   * `chooseFolder`: first the system "Save as" window, where the user picks the folder
+   * (and may change the name); closing it leaves the name dialog open.
+   */
+  const onSaveAs = async (kind: SaveKind, name: string, then?: () => void, chooseFolder = false) => {
+    const ext = saveExt(kind);
+    let target: SaveTarget | undefined;
+    if (chooseFolder) {
+      try {
+        const description = kind === 'project' ? 'Projekt Mosaic' : exportType === 'png' ? 'Obraz PNG' : 'Obraz JPG';
+        const mime = kind === 'project' ? 'application/octet-stream' : `image/${exportType}`;
+        target = (await chooseLocation(name + ext, kind, mime, ext, description)) ?? undefined;
+      } catch {
+        toast('Nie udało się otworzyć okna zapisu');
+        return;
+      }
+      if (!target) return;
+    }
     setSaveAs(null);
-    const ok = kind === 'project' ? onSaveProject(name) : await onExport(name);
+    const ok = kind === 'project' ? await onSaveProject(name, target) : await onExport(name, target);
     if (!ok) return;
-    savePref(nameKey(kind), rememberName(name, nameMemory(kind)));
+    const saved = target ? cleanName(target.name, ext) || name : name;
+    savePref(nameKey(kind), rememberName(saved, nameMemory(kind)));
+    if (target) toast(`Zapisano: ${target.name}`);
     then?.();
   };
 
@@ -133,8 +155,8 @@ export function App() {
     toast(`Utworzono ${result.docs.length} ${collagesWord(result.docs.length)} z ${photos} ${photosWord(photos)}${result.skipped ? ` (pominięto ${result.skipped})` : ''}`);
   };
 
-  /** The collages to save: the edited one as it is now, empty ones left out. */
-  const seriesDocs = () => mosaic.batch.map((d) => (d.batchKey === mosaic.doc.batchKey ? mosaic.doc : d)).filter((d) => d.photos.length > 0);
+  /** The collages to save, the edited one as it is now (the dialog skips empty ones). */
+  const seriesDocs = () => mosaic.batch.map((d) => (d.batchKey === mosaic.doc.batchKey ? mosaic.doc : d));
 
   const openDrawer = (t: PanelTab) => {
     setTab(t);
@@ -251,8 +273,9 @@ export function App() {
         <FileNameDialog
           title={saveAs.kind === 'project' ? 'Zapisz projekt' : 'Zapisz kolaż'}
           initial={suggestName(nameMemory(saveAs.kind), defaultFileBase(mosaic.doc.sheet))}
-          ext={saveAs.kind === 'project' ? PROJECT_EXT : exportExt(exportType)}
+          ext={saveExt(saveAs.kind)}
           onSave={(name) => void onSaveAs(saveAs.kind, name, saveAs.after)}
+          onSaveTo={canChooseLocation() ? (name) => void onSaveAs(saveAs.kind, name, saveAs.after, true) : undefined}
           onCancel={() => setSaveAs(null)}
         />
       )}

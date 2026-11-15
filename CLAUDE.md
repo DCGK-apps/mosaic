@@ -78,6 +78,8 @@ src/toast.ts       krótki komunikat na górze ekranu
 
 Przyciski „Zapisz projekt” i „Zapisz Kolaż na Dysku” oraz opcje w `NewProjectDialog` nie zapisują od razu. Ustawiają w `App.tsx` stan `saveAs = { kind: 'project' | 'image', after? }`, a ten otwiera `FileNameDialog`. Po zatwierdzeniu `onSaveAs` zapisuje plik (`mosaic.saveProject(name)` albo `exportMosaic(..., name)`). Dopiero gdy zapis się uda, zapamiętuje nazwę w prefs (`lastProjectName` / `lastImageName`, osobno dla projektów i obrazów) i wywołuje `after` (np. startNewProject).
 
+„Zapisz w…” (`filename-save-to`, tylko gdy `canChooseLocation()` – Chrome/Edge na komputerze): `onSaveAs(..., chooseFolder=true)` najpierw otwiera `chooseLocation` (`showSaveFilePicker`, `id` = `mosaic-image` / `mosaic-project`, więc przeglądarka pamięta folder osobno dla obrazów i projektów). Zamknięcie okna zostawia `FileNameDialog` otwarty. Zapamiętywana jest nazwa wybrana w oknie systemu. `exportMosaic` i `saveProject` przyjmują opcjonalny `SaveTarget`. E2E: `tests/e2e/save-to.spec.ts` (podmieniony `showSaveFilePicker`).
+
 Numeracja nazw: pierwsza podpowiedź to `kolaz_504x506mm`, potem ostatnia nazwa + dwucyfrowy numer (`wakacje` → `wakacje01` → `wakacje02`, po 99 jest 100). Dwie cyfry na końcu wpisane przez użytkownika liczą się jako licznik. Inne liczby (rok, wymiar) są częścią nazwy. Domyślna nazwa kończy się na „mm” właśnie dlatego, żeby wymiaru nie uznać za licznik.
 
 ### Seria „Kolaże z folderu” (tylko komputer)
@@ -90,6 +92,7 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 - Otwarty projekt `.mosaic` traci `batchKey` (to samodzielny kolaż).
 - Autozapis trzyma zdjęcia z `doc` ∪ wszystkich kolaży serii; miniatury zdjęć (240 px) osobno w store `thumbs`.
 - `planBatch`: programowanie dynamiczne po kolejnych zdjęciach; koszt kolażu = `layoutCost` (te same kryteria co Auto) × liczba zdjęć + lekka kara za nierówne rozmiary + duża kara za wyjście poza zakres (tylko gdy zakresu nie da się spełnić). Dla 500 zdjęć i zakresu 2–20 trwa ~4 s, dlatego jest async z `tick` (postęp, przerwanie).
+- `saveSeries` nie przerywa się na jednym kolażu: brak pamięci (`RenderError('memory')`) ponawia raz po 0,5 s, nieczytelne zdjęcie (`RenderError('photo')`) i błąd zapisu nie. Zwraca `{ saved, failed }`, a `SeriesSaveDialog` pokazuje raport z przyczynami i „Spróbuj ponownie” tylko dla nieudanych. Numer pliku = numer kolażu w panelu; puste kolaże są pomijane, a okno o tym informuje.
 - E2E: `tests/e2e/series.spec.ts` – folder wybiera `setInputFiles(ASSETS)`, `showDirectoryPicker` jest podmieniany w `addInitScript`; `__mosaic.batch()` zwraca serię.
 
 ### Preferencje w localStorage (`mosaic.prefs`)

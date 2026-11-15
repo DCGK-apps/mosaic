@@ -1,4 +1,4 @@
-import { Save, X } from 'lucide-react';
+import { FolderOpen, Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cleanName } from '../core/filename';
 
@@ -9,11 +9,13 @@ interface Props {
   /** E.g. ".jpg" – shown after the field, added to the name. */
   ext: string;
   onSave: (name: string) => void;
+  /** Where the browser allows it: save through the system "Save as" window, choosing the folder. */
+  onSaveTo?: (name: string) => void;
   onCancel: () => void;
 }
 
 /** Asks for the file name before saving. */
-export function FileNameDialog({ title, initial, ext, onSave, onCancel }: Props) {
+export function FileNameDialog({ title, initial, ext, onSave, onSaveTo, onCancel }: Props) {
   const [value, setValue] = useState(initial);
   const input = useRef<HTMLInputElement>(null);
   const name = cleanName(value, ext);
@@ -64,10 +66,27 @@ export function FileNameDialog({ title, initial, ext, onSave, onCancel }: Props)
           />
           <span className="pr-3 text-sm text-slate-500">{ext}</span>
         </div>
+        {onSaveTo && (
+          <p className="mt-3 text-xs text-slate-500" data-testid="filename-hint">
+            „Zapisz” – do folderu pobranych plików. „Zapisz w…” – wybierasz folder (okno otworzy się w ostatnio użytym).
+          </p>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100" data-testid="filename-cancel">
             Anuluj
           </button>
+          {onSaveTo && (
+            <button
+              type="button"
+              disabled={!name}
+              onClick={() => onSaveTo(name)}
+              title="Wybierz folder i nazwę w oknie zapisu systemu"
+              className="flex items-center gap-2 rounded-lg border border-brand px-4 py-2 text-sm font-bold text-brand hover:bg-blue-50 disabled:opacity-40"
+              data-testid="filename-save-to"
+            >
+              <FolderOpen className="h-4 w-4" /> Zapisz w…
+            </button>
+          )}
           <button
             type="submit"
             disabled={!name}
