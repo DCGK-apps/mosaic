@@ -8,6 +8,7 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 - **Układy:** Auto (losuje tysiące podziałów i wybiera najlepiej pasujący do proporcji zdjęć, z historią losowań), Siatka, Centralny, Poziomo, Pionowo.
 - **Krawędzie** między zdjęciami można przeciągać (myszą i palcem).
 - **Kadrowanie:** przeciąganie zdjęcia, powiększanie przyciskami, kółkiem myszy lub szczypaniem. Zdjęcie zawsze wypełnia pole, nie da się zrobić pustej dziury.
+- **Napisy:** przycisk „Dodaj napis” nad arkuszem. Napis z polskimi znakami, w kilku liniach, można dowolnie przesuwać, powiększać (kółko w rogu) i obracać (uchwyt u góry, przyciąga do 0°/45°/90°). Pasek pod arkuszem: 7 czcionek (Roboto, Lora, Playfair Display, Oswald, Caveat, Pacifico, Comfortaa – wbudowane, działają offline i wyglądają tak samo na każdym urządzeniu), rozmiar w mm wydruku, pogrubienie, kursywa, podkreślenie, wyrównanie, cień, kolor. Dwuklik na napisie – edycja treści, Delete – usunięcie. Napisy są w eksporcie, projekcie `.mosaic` i autozapisie.
 - **Zamiana miejsc:** przeciągnięcie zdjęcia na inne (działa też dotykiem).
 - **Magazyn odłożonych** zdjęć: odłóż, przywróć, usuń trwale.
 - **Wymiary:** gotowe formaty (A4, A3, 30 × 40 cm…) lub własne, obrót pion/poziom; ramka i zaokrąglenie w milimetrach wydruku.
@@ -81,3 +82,5 @@ Settings → Pages → Build and deployment → Source: **GitHub Actions**.
 ## Licencja
 
 Apache 2.0 – zobacz [LICENSE](LICENSE).
+
+Czcionki napisów w `public/fonts` są na licencji SIL Open Font License 1.1 – zobacz [public/fonts/OFL.txt](public/fonts/OFL.txt).

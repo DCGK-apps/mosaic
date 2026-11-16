@@ -1,5 +1,6 @@
 import { DEFAULT_CROP } from '../core/crop';
 import { DEFAULT_SHEET, docReducer, emptyDoc } from '../core/doc';
+import { cleanText, FONTS, type FontId, type TextBox } from '../core/text';
 import { removePhoto } from '../core/tree';
 import type { Crop, Doc, LayoutMode, Node, Photo, Sheet } from '../core/types';
 
@@ -54,6 +55,26 @@ function parseSheet(v: unknown): Sheet {
   };
 }
 
+function parseText(v: unknown): TextBox | null {
+  if (!isObj(v) || !str(v.id) || typeof v.text !== 'string') return null;
+  const font = FONTS.some((f) => f.id === v.font) ? (v.font as FontId) : 'roboto';
+  return cleanText({
+    id: v.id,
+    text: v.text,
+    x: num(v.x, 0.5),
+    y: num(v.y, 0.5),
+    sizeMm: num(v.sizeMm, 20),
+    font,
+    bold: v.bold === true,
+    italic: v.italic === true,
+    underline: v.underline === true,
+    color: typeof v.color === 'string' ? v.color : '#ffffff',
+    align: v.align === 'left' || v.align === 'right' ? v.align : 'center',
+    rotation: num(v.rotation, 0),
+    shadow: v.shadow === true,
+  });
+}
+
 /**
  * Rebuilds a document from saved data. Anything broken is replaced with a
  * default; photos whose image is missing (`hasImage` false) are left out.
@@ -86,6 +107,7 @@ export function restoreDoc(raw: unknown, hasImage: (photoId: string) => boolean)
     tree: prune(parseNode(d.tree)),
     autoHistory,
     autoIndex: Math.min(Math.max(0, Math.floor(num(d.autoIndex, 0))), Math.max(0, autoHistory.length - 1)),
+    ...(Array.isArray(d.texts) && d.texts.length ? { texts: d.texts.map(parseText).filter((t): t is TextBox => !!t) } : {}),
     ...(str(d.batchKey) ? { batchKey: d.batchKey } : {}),
   };
   // Clamp the sheet values through the reducer, so the limits live in one place.

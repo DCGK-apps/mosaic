@@ -2,6 +2,7 @@ import { drawMosaic, exportFileName, exportSize, MAX_PIXELS, MAX_PIXELS_IOS, typ
 import { currentTree } from './core/doc';
 import type { Doc } from './core/types';
 import { download, type SaveTarget } from './download';
+import { loadFonts } from './fonts';
 import { loadImage } from './images';
 import { isIos } from './pwa';
 
@@ -24,6 +25,7 @@ export class RenderError extends Error {
 export async function renderMosaic(doc: Doc, urlOf: (photoId: string) => string | undefined, dpi: number, type: ExportType): Promise<Blob> {
   const size = exportSize(doc.sheet, dpi, maxPixels());
   const images = new Map<string, HTMLImageElement>();
+  await loadFonts(doc.texts ?? []);
   await Promise.all(
     doc.photos.map(async (p) => {
       const url = urlOf(p.id);
@@ -41,7 +43,7 @@ export async function renderMosaic(doc: Doc, urlOf: (photoId: string) => string 
     canvas.height = size.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new RenderError('memory');
-    drawMosaic(ctx, { tree: currentTree(doc), sheet: doc.sheet, photos: doc.photos }, images, size.pxPerMm);
+    drawMosaic(ctx, { tree: currentTree(doc), sheet: doc.sheet, photos: doc.photos, texts: doc.texts }, images, size.pxPerMm);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, `image/${type}`, 0.95));
     if (!blob) throw new RenderError('memory');
     return blob;

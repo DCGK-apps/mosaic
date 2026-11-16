@@ -73,6 +73,8 @@ export interface Doc {
   /** Layouts drawn in the auto mode – the user can browse them. */
   autoHistory: Node[];
   autoIndex: number;
+  /** Captions on the sheet, drawn above the photos in this order. */
+  texts?: TextBox[];
   /**
    * Set on the collages of an automatic series ("Kolaże z folderu"): which
    * collage of the series this document is, so edits go back to it.
@@ -85,4 +87,29 @@ export interface Rect {
   y: number;
   w: number;
   h: number;
+}
+
+export type FontId = 'roboto' | 'lora' | 'playfair' | 'oswald' | 'caveat' | 'pacifico' | 'comfortaa';
+export type TextAlign = 'left' | 'center' | 'right';
+
+/** A caption on the sheet (see core/text.ts). */
+export interface TextBox {
+  id: string;
+  /** The caption; may have several lines ("\n"). */
+  text: string;
+  /** Centre of the caption as a share of the sheet's width and height (0..1), so it stays in place when the size changes. */
+  x: number;
+  y: number;
+  /** Font size in millimetres of the printed sheet. */
+  sizeMm: number;
+  font: FontId;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  color: string;
+  align: TextAlign;
+  /** Clockwise, in degrees (-180..180). */
+  rotation: number;
+  /** Soft dark shadow – makes a caption readable on a busy photo. */
+  shadow: boolean;
 }

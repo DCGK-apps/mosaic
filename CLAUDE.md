@@ -26,18 +26,22 @@ E2E działa w dwóch projektach, `desktop` i `mobile` (Pixel 7). Pełny przebieg
 
 ```
 src/core/          czysta logika (testy w tests/unit)
-  types.ts         model: Doc { photos, magazine, sheet, mode, tree, autoHistory, autoIndex }
+  types.ts         model: Doc { photos, magazine, sheet, mode, tree, autoHistory, autoIndex, texts? }
+                   TextBox: x,y = środek jako ułamek arkusza 0..1, sizeMm, font, bold/italic/underline, rotation…
                    tree = drzewo binarne: Leaf{photoId} | Split{dir 'V'|'H', frac, a, b}
                    Sheet w mm: widthMm, heightMm, gapMm, radiusMm, frameColor
                    Crop {x,y ∈ -1..1, zoom ≥ 1} – zdjęcie zawsze „cover”
   doc.ts           docReducer + DocAction (addPhotos, toMagazine, fromMagazine, deleteFromMagazine,
-                   setMode, shuffle, autoStep, setFrac, swap, setCrop, setSheet, rotateSheet);
+                   setMode, shuffle, autoStep, setFrac, swap, setCrop, setSheet, rotateSheet,
+                   addText, updateText, deleteText);
                    akcje losowe dostają `seed` (reducer jest czysty), DEFAULT_SHEET, emptyDoc
   layouts.ts       generatory układów (auto losuje wiele drzew i ocenia dopasowanie proporcji)
   geometry.ts      prostokąty pól/krawędzi w mm – WSPÓLNE dla podglądu i eksportu
+  text.ts          napisy: FONTS, newTextBox, cleanText, layoutText (linie w mm – WSPÓLNE dla podglądu
+                   i eksportu; pomiar przez Measure = canvas measureText), fontCss, moveText, snapAngle
   crop.ts tree.ts  kadrowanie; operacje na drzewie
   history.ts       undo/redo; przeciąganie = `preview` (transient) + `end` → jeden krok
-  export.ts        drawMosaic (canvas), exportSize (DPI, limity pikseli, iOS), nazwy plików:
+  export.ts        drawMosaic (canvas, na końcu drawTexts), canvasMeasure, exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
   filename.ts      nazwa pliku przy zapisie: suggestName / rememberName / cleanName
   batch.ts         seria „Kolaże z folderu”: inChosenFolder (bez podfolderów), sortFiles, planBatch (DP – podział na kolaże), buildBatch,
@@ -57,7 +61,8 @@ src/hooks/
   useShortcuts.ts  Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y
 src/components/
   sidebar/         Sidebar + sekcje: Photos, Magazine, Layout, Size, Style, Export, Project
-  workspace/       Workspace (drop plików), SheetView, Cell (kadrowanie, zamiana), Divider (krawędź)
+  workspace/       Workspace (drop plików, „Dodaj napis”, zaznaczony napis), SheetView, Cell (kadrowanie, zamiana),
+                   Divider (krawędź), TextItem (napis + TextFrame z uchwytami), TextToolbar (pasek edycji napisu)
   NewProjectDialog.tsx  „Nowy projekt”: zapisać? → jako projekt / jako obraz
   FileNameDialog.tsx    pole „Nazwa pliku” + rozszerzenie, Enter/Escape
   AutoCollageDialog.tsx „Kolaże z folderu” (z-60): folder, od–do, kolejność, układ, format, ramka; postęp
@@ -72,6 +77,8 @@ src/download.ts    pobranie bloba przez <a download>
 src/prefs.ts       localStorage „mosaic.prefs” (loadPref/savePref)
 src/pwa.ts sw-template.js  instalacja, baner „Dostępna nowa wersja”; sw.js generuje vite.config.ts
 src/toast.ts       krótki komunikat na górze ekranu
+src/fonts.ts       czcionki napisów: registerFonts (FontFace z public/fonts, podzbiory latin/latin-ext),
+                   loadFonts (przed eksportem), useTextMeasure (nowy pomiar po wczytaniu czcionki)
 ```
 
 ### Przepływ zapisu (po zmianie z 2026-11)
@@ -94,6 +101,13 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 - `planBatch`: programowanie dynamiczne po kolejnych zdjęciach; koszt kolażu = `layoutCost` (te same kryteria co Auto) × liczba zdjęć + lekka kara za nierówne rozmiary + duża kara za wyjście poza zakres (tylko gdy zakresu nie da się spełnić). Dla 500 zdjęć i zakresu 2–20 trwa ~4 s, dlatego jest async z `tick` (postęp, przerwanie).
 - `saveSeries` nie przerywa się na jednym kolażu: brak pamięci (`RenderError('memory')`) ponawia raz po 0,5 s, nieczytelne zdjęcie (`RenderError('photo')`) i błąd zapisu nie. Zwraca `{ saved, failed }`, a `SeriesSaveDialog` pokazuje raport z przyczynami i „Spróbuj ponownie” tylko dla nieudanych. Numer pliku = numer kolażu w panelu; puste kolaże są pomijane, a okno o tym informuje.
 - E2E: `tests/e2e/series.spec.ts` – folder wybiera `setInputFiles(ASSETS)`, `showDirectoryPicker` jest podmieniany w `addInitScript`; `__mosaic.batch()` zwraca serię.
+
+### Napisy
+
+- Pliki czcionek (woff2 z Fontsource, OFL – `public/fonts/OFL.txt`) leżą obok `index.html`, nie są wklejane do pliku. Service worker zapisuje je w cache, więc działają offline. Polskie litery są w podzbiorze `latin-ext`.
+- Podgląd rysuje każdą linię jako osobny `div` w pozycji z `layoutText`, eksport rysuje te same linie na canvasie – dlatego wyglądają tak samo. Napisy są przycinane do arkusza (warstwa `overflow-hidden`), a ramka z uchwytami (`TextFrame`) leży poza nią.
+- Pisanie w polu i zmiana koloru to `transient`, krok historii kończy się na `blur`/„Gotowe”.
+- E2E: `tests/e2e/text.spec.ts` (testid `text-add`, `text-box`, `text-input`, `text-font`, `text-resize`, `text-rotate`, `text-done`, `text-delete`…).
 
 ### Preferencje w localStorage (`mosaic.prefs`)
 
