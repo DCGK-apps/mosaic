@@ -4,6 +4,7 @@ import { imageRect, panCrop, setZoom, ZOOM_STEP } from '../../core/crop';
 import { cellRadius, type CellBox } from '../../core/geometry';
 import type { Crop, Photo } from '../../core/types';
 import { cx } from '../cx';
+import type { Tool } from './ToolSwitch';
 
 /** Movement (px) below which a press counts as a tap. */
 const TAP_SLOP = 4;
@@ -15,7 +16,7 @@ export interface CellProps {
   /** Screen pixels per millimetre. */
   scale: number;
   radiusMm: number;
-  swapMode: boolean;
+  tool: Tool;
   /** Tapped on a touch screen – shows the controls that otherwise appear on hover. */
   active: boolean;
   /** Being dragged to another cell (swap mode). */
@@ -26,10 +27,14 @@ export interface CellProps {
   onEnd: () => void;
   onRemove: (photoId: string) => void;
   onSwapStart: (leafId: string, e: ReactPointerEvent) => void;
+  /** "Układ" tool: a drag anywhere on the photo moves its nearest edge. */
+  onEdgeStart: (cell: CellBox, e: ReactPointerEvent) => void;
 }
 
 export function Cell(props: CellProps) {
-  const { cell, photo, url, scale, swapMode, active } = props;
+  const { cell, photo, url, scale, tool, active } = props;
+  const swapMode = tool === 'swap';
+  const edgesMode = tool === 'edges';
   const el = useRef<HTMLDivElement>(null);
   const crop = useRef(photo.crop);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -47,7 +52,7 @@ export function Cell(props: CellProps) {
     const timer = { id: 0 };
     const onWheel = (e: WheelEvent) => {
       const p = latest.current;
-      if (p.swapMode) return;
+      if (p.tool !== 'crop') return;
       e.preventDefault();
       const next = setZoom(p.photo.crop, p.photo.crop.zoom + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
       p.onCrop(p.photo.id, next, true);
@@ -71,6 +76,10 @@ export function Cell(props: CellProps) {
     if (e.button !== 0) return;
     if (swapMode) {
       props.onSwapStart(cell.leafId, e);
+      return;
+    }
+    if (edgesMode) {
+      props.onEdgeStart(cell, e);
       return;
     }
     e.preventDefault();
@@ -133,7 +142,7 @@ export function Cell(props: CellProps) {
       }}
       className={cx(
         'group absolute touch-none overflow-hidden bg-slate-100 transition-opacity',
-        swapMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-move',
+        swapMode ? 'cursor-grab active:cursor-grabbing' : edgesMode ? 'cursor-default' : 'cursor-move',
         props.dropTarget && 'outline outline-4 -outline-offset-4 outline-brand',
       )}
       onPointerDown={onPointerDown}
@@ -151,26 +160,30 @@ export function Cell(props: CellProps) {
         />
       )}
 
-      <div className={cx('pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100', swapMode ? 'bg-brand/20' : 'bg-black/10')}>
-        {swapMode ? <ArrowLeftRight className="h-8 w-8 text-white drop-shadow-md" /> : <Move className="h-8 w-8 text-white drop-shadow-md" />}
-      </div>
+      {!edgesMode && (
+        <div className={cx('pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100', swapMode ? 'bg-brand/20' : 'bg-black/10')}>
+          {swapMode ? <ArrowLeftRight className="h-8 w-8 text-white drop-shadow-md" /> : <Move className="h-8 w-8 text-white drop-shadow-md" />}
+        </div>
+      )}
 
-      <button
-        type="button"
-        className={cx(
-          'absolute right-2 top-2 z-20 rounded bg-black/60 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-600 focus-visible:opacity-100 group-hover:opacity-100',
-          active && 'opacity-100',
-        )}
-        onPointerDown={stop}
-        onClick={() => props.onRemove(photo.id)}
-        title="Usuń do magazynu"
-        aria-label="Usuń do magazynu"
-        data-testid="cell-remove"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {!edgesMode && (
+        <button
+          type="button"
+          className={cx(
+            'absolute right-2 top-2 z-20 rounded bg-black/60 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-600 focus-visible:opacity-100 group-hover:opacity-100',
+            active && 'opacity-100',
+          )}
+          onPointerDown={stop}
+          onClick={() => props.onRemove(photo.id)}
+          title="Usuń do magazynu"
+          aria-label="Usuń do magazynu"
+          data-testid="cell-remove"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
 
-      {!swapMode && (
+      {tool === 'crop' && (
         <div
           className={cx(
             'absolute bottom-2 right-2 z-20 flex overflow-hidden rounded bg-black/60 text-white opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100',

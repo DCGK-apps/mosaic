@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
-import { beginEdgeDrag, dragFrac, type EdgeDrag, type Junction } from '../../core/edges';
+import { beginEdgeDrag, cellEdge, dragFrac, type EdgeDrag, type Junction } from '../../core/edges';
+import type { CellBox, Layout } from '../../core/geometry';
 import { isolateSegment, joinLine } from '../../core/restructure';
 import type { Dir, Node, Sheet } from '../../core/types';
 import type { Mosaic } from '../../hooks/useMosaic';
@@ -16,6 +17,7 @@ const MOVE_SLOP_PX = 2;
 interface Params {
   tree: Node | null;
   sheet: Sheet;
+  layout: Layout;
   /** Screen pixels per millimetre. */
   scale: number;
   sheetRef: RefObject<HTMLDivElement | null>;
@@ -30,12 +32,15 @@ interface Params {
  * - a crossing (knob, cursor ✥): the first movement picks the line
  *   (sideways → the vertical one, up/down → the horizontal one) and the whole
  *   line moves – parts in line with each other are joined first (joinLine).
+ * - a photo, with the "Układ" tool: the movement picks the axis and the
+ *   photo's edge nearer to the finger moves (only that part, as above).
  * Cells never collapse, edges snap into line with others; one drag = one undo step.
  */
 export function useEdgeDrag(params: Params): {
   active: string | null;
   onGrabEdge: (splitId: string, e: ReactPointerEvent) => void;
   onGrabJunction: (j: Junction, e: ReactPointerEvent) => void;
+  onGrabCell: (cell: CellBox, e: ReactPointerEvent) => void;
 } {
   const latest = useRef(params);
   useLayoutEffect(() => {
@@ -44,7 +49,7 @@ export function useEdgeDrag(params: Params): {
   const [active, setActive] = useState<string | null>(null);
 
   /** `pick` chooses the edge once the direction of the movement is known (null: not yet). */
-  const start = useCallback((e: ReactPointerEvent, pick: (dir: Dir | null) => string | null, mode: 'part' | 'line') => {
+  const start = useCallback((e: ReactPointerEvent, pick: (dir: Dir | null, at: { x: number; y: number }) => string | null, mode: 'part' | 'line') => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -54,7 +59,7 @@ export function useEdgeDrag(params: Params): {
     const at = { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
     const pointerId = e.pointerId;
     const origin = { x: e.clientX, y: e.clientY };
-    let chosen = pick(null);
+    let chosen = pick(null, at);
     let drag: EdgeDrag | null = null;
     if (chosen) setActive(chosen);
 
@@ -64,7 +69,7 @@ export function useEdgeDrag(params: Params): {
       const dy = ev.clientY - origin.y;
       if (!chosen) {
         if (Math.hypot(dx, dy) < DIRECTION_SLOP_PX) return;
-        chosen = pick(Math.abs(dx) >= Math.abs(dy) ? 'V' : 'H');
+        chosen = pick(Math.abs(dx) >= Math.abs(dy) ? 'V' : 'H', at);
         if (!chosen) return;
         setActive(chosen);
       }
@@ -100,5 +105,22 @@ export function useEdgeDrag(params: Params): {
     (j: Junction, e: ReactPointerEvent) => start(e, (dir) => (dir === 'V' ? j.vertical[0] : dir === 'H' ? j.horizontal[0] : null) ?? null, 'line'),
     [start],
   );
-  return { active, onGrabEdge, onGrabJunction };
+  const onGrabCell = useCallback(
+    (cell: CellBox, e: ReactPointerEvent) =>
+      start(
+        e,
+        (dir, at) => {
+          if (!dir) return null;
+          const d = cellEdge(latest.current.layout, cell, dir, at);
+          if (!d) return null;
+          // Cut the edge where it borders this photo: the point on the edge next to the finger.
+          at.x = dir === 'V' ? d.x + d.w / 2 : Math.min(cell.x + cell.w, Math.max(cell.x, at.x));
+          at.y = dir === 'H' ? d.y + d.h / 2 : Math.min(cell.y + cell.h, Math.max(cell.y, at.y));
+          return d.splitId;
+        },
+        'part',
+      ),
+    [start],
+  );
+  return { active, onGrabEdge, onGrabJunction, onGrabCell };
 }

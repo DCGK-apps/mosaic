@@ -6,6 +6,8 @@ import { HIT_PX } from './useEdgeDrag';
 
 /** Grab area of a crossing knob in screen pixels. */
 const KNOB_PX = 24;
+/** …larger with the "Układ" tool, made for a finger. */
+const KNOB_LARGE_PX = 40;
 
 interface Props {
   divider: DividerBox;
@@ -13,11 +15,13 @@ interface Props {
   scale: number;
   /** Being dragged – the handle stays visible. */
   active: boolean;
+  /** "Układ" tool: handles always visible. */
+  shown?: boolean;
   /** The drag itself is handled by useEdgeDrag. */
   onGrab: (splitId: string, e: ReactPointerEvent) => void;
 }
 
-export function Divider({ divider: d, scale, active, onGrab }: Props) {
+export function Divider({ divider: d, scale, active, shown, onGrab }: Props) {
   const vertical = d.dir === 'V';
   const thick = Math.max(HIT_PX, (vertical ? d.w : d.h) * scale);
   const style = vertical
@@ -40,7 +44,7 @@ export function Divider({ divider: d, scale, active, onGrab }: Props) {
       <div
         className={cx(
           'rounded-full bg-blue-900 transition-opacity group-hover:opacity-100',
-          active ? 'opacity-100' : 'opacity-0',
+          active ? 'opacity-100' : shown ? 'opacity-60' : 'opacity-0',
           vertical ? 'h-12 w-1.5' : 'h-1.5 w-12',
         )}
       />
@@ -52,12 +56,13 @@ interface JunctionProps {
   junction: Junction;
   scale: number;
   active: boolean;
+  large?: boolean;
   onGrab: (j: Junction, e: ReactPointerEvent) => void;
 }
 
 /** Knob on a crossing: grabbed here, the whole line moves (the direction of the drag picks which one). */
-export function JunctionKnob({ junction: j, scale, active, onGrab }: JunctionProps) {
-  const size = Math.max(KNOB_PX, Math.max(j.w, j.h) * scale + 6);
+export function JunctionKnob({ junction: j, scale, active, large, onGrab }: JunctionProps) {
+  const size = Math.max(large ? KNOB_LARGE_PX : KNOB_PX, Math.max(j.w, j.h) * scale + 6);
   return (
     <div
       data-testid="junction"
@@ -68,7 +73,8 @@ export function JunctionKnob({ junction: j, scale, active, onGrab }: JunctionPro
     >
       <div
         className={cx(
-          'h-3 w-3 rounded-full border-2 border-blue-900 bg-white shadow transition-opacity group-hover:opacity-100',
+          large ? 'h-5 w-5' : 'h-3 w-3',
+          'rounded-full border-2 border-blue-900 bg-white shadow transition-opacity group-hover:opacity-100',
           active ? 'opacity-100' : 'opacity-70',
         )}
       />

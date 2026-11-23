@@ -3,12 +3,15 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import { newTextBox, type TextBox } from '../../core/text';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { Mosaic } from '../../hooks/useMosaic';
+import { cx } from '../cx';
 import { SheetView } from './SheetView';
 import { TextToolbar } from './TextToolbar';
+import { ToolSwitch, type Tool } from './ToolSwitch';
 
 interface Props {
   mosaic: Mosaic;
-  swapMode: boolean;
+  tool: Tool;
+  onTool: (tool: Tool) => void;
   onFiles: (files: File[]) => void;
 }
 
@@ -18,7 +21,7 @@ const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isCon
 const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
 
 /** The area around the sheet; also accepts photos dropped from the computer. */
-export function Workspace({ mosaic, swapMode, onFiles }: Props) {
+export function Workspace({ mosaic, tool, onTool, onFiles }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const size = useElementSize(box);
   const [dropping, setDropping] = useState(false);
@@ -103,7 +106,7 @@ export function Workspace({ mosaic, swapMode, onFiles }: Props) {
     >
       <div
         ref={box}
-        className="flex min-h-0 w-full flex-1 items-center justify-center"
+        className={cx('flex min-h-0 w-full flex-1 items-center justify-center', hasPhotos && 'pt-12')}
         onPointerDown={(e) => {
           if (e.target === e.currentTarget) setSelectedText(null);
         }}
@@ -120,7 +123,7 @@ export function Workspace({ mosaic, swapMode, onFiles }: Props) {
               mosaic={mosaic}
               width={size.width}
               height={size.height}
-              swapMode={swapMode}
+              tool={tool}
               selectedText={selected ? selected.id : null}
               onSelectText={selectText}
               onEditText={editText}
@@ -138,6 +141,11 @@ export function Workspace({ mosaic, swapMode, onFiles }: Props) {
           onDone={done}
           focusKey={focusKey}
         />
+      )}
+      {hasPhotos && (
+        <div className="absolute left-3 top-3 z-20">
+          <ToolSwitch tool={tool} onTool={onTool} />
+        </div>
       )}
       {hasPhotos && (
         <button

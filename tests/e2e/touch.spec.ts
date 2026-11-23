@@ -39,7 +39,7 @@ test('tapping a photo shows its controls (there is no hover on a phone)', async 
 
 test('photos are swapped by dragging with a finger', async ({ page }) => {
   const before = await shownPhotos(page);
-  await inPanel(page, () => page.getByTestId('tool-swap').click());
+  await page.getByTestId('tool-swap').click();
   const a = center(await box(cells(page).nth(0)));
   const b = center(await box(cells(page).nth(1)));
   await touchDrag(page, a, b);

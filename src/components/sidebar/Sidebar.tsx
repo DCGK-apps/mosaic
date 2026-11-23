@@ -16,8 +16,6 @@ export type PanelTab = 'photos' | 'options';
 
 export interface SidebarProps {
   mosaic: Mosaic;
-  swapMode: boolean;
-  onSwapMode: (swap: boolean) => void;
   onAddPhotos: () => void;
   dpi: number;
   exportType: ExportType;
@@ -60,7 +58,7 @@ export function UndoRedo({ mosaic, dark }: { mosaic: Mosaic; dark?: boolean }) {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { mosaic, swapMode, onSwapMode, onAddPhotos, onClose, tab, onTab } = props;
+  const { mosaic, onAddPhotos, onClose, tab, onTab } = props;
   const { doc, act, endGesture, urlOf } = mosaic;
   const hasPhotos = doc.photos.length > 0;
 
@@ -161,11 +159,9 @@ export function Sidebar(props: SidebarProps) {
               mode={doc.mode}
               autoIndex={doc.autoIndex}
               autoCount={doc.autoHistory.length}
-              swapMode={swapMode}
               onMode={(mode) => act({ type: 'setMode', mode })}
               onAutoStep={(delta) => act({ type: 'autoStep', delta })}
               onShuffle={() => act({ type: 'shuffle' })}
-              onSwapMode={onSwapMode}
             />
             <Separator />
           </>

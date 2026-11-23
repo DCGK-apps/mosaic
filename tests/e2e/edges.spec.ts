@@ -134,3 +134,48 @@ test('touch: a finger moves one half of a crossed edge', async ({ page }, info) 
   const after = await cellBoxes(page);
   expect(after[0]).toEqual(before[0]);
 });
+
+test('"Układ" tool: dragging inside a photo moves its nearest edge, not the crop', async ({ page }) => {
+  await page.getByTestId('tool-edges').click();
+  await expect(page.getByTestId('tool-edges')).toHaveAttribute('aria-checked', 'true');
+  const before = await cellBoxes(page);
+  const crops = (await getDoc(page)).photos.map((p: { crop: unknown }) => p.crop);
+  // Down in the bottom-right photo, near its top: the edges form a cross, so only the right half of the horizontal edge moves.
+  const d = before[3]!;
+  const p = { x: d.x + d.width * 0.5, y: d.y + d.height * 0.2 };
+  await mouseDrag(page, p, { x: p.x + 2, y: p.y + 30 });
+  const after = await cellBoxes(page);
+  expect(after[3]!.height).toBeLessThan(d.height - 20);
+  expect(after[1]!.height).toBeGreaterThan(before[1]!.height + 20);
+  expect(after[0]).toEqual(before[0]);
+  expect(after[2]).toEqual(before[2]);
+  // Top-left photo, near its right side, dragged to the right: the vertical edge moves –
+  // as a whole, since the horizontal halves are no longer in line (no crossing to cut at).
+  const a = after[0]!;
+  const from = { x: a.x + a.width * 0.8, y: a.y + a.height * 0.5 };
+  await mouseDrag(page, from, { x: from.x + 40, y: from.y + 3 });
+  const last = await cellBoxes(page);
+  expect(last[0]!.width).toBeGreaterThan(a.width + 30);
+  expect(last[1]!.width).toBeLessThan(after[1]!.width - 30);
+  expect(last[2]!.width).toBeGreaterThan(after[2]!.width + 30);
+  expect(last[0]!.height).toBeCloseTo(after[0]!.height, 0);
+  expect((await getDoc(page)).photos.map((ph: { crop: unknown }) => ph.crop)).toEqual(crops);
+});
+
+test('touch, "Układ" tool: a finger anywhere on a photo moves the edge', async ({ page }, info) => {
+  test.skip(!info.project.use.hasTouch, 'touch-only');
+  await page.getByTestId('tool-edges').click();
+  const before = await cellBoxes(page);
+  const c = before[2]!; // bottom-left
+  const from = { x: c.x + c.width * 0.5, y: c.y + c.height * 0.4 };
+  await touchDrag(page, from, { x: from.x, y: from.y - 30 });
+  await expect.poll(async () => (await cellBoxes(page))[2]!.height).toBeGreaterThan(c.height + 20);
+  const after = await cellBoxes(page);
+  expect(after[3]).toEqual(before[3]);
+  // Back to the crop tool: dragging moves the photo inside again.
+  await page.getByTestId('tool-crop').click();
+  const crop0 = (await getDoc(page)).photos[2].crop.x;
+  const cc = (await cellBoxes(page))[2]!;
+  await touchDrag(page, { x: cc.x + cc.width / 2, y: cc.y + cc.height / 2 }, { x: cc.x + cc.width / 2 + 30, y: cc.y + cc.height / 2 });
+  await expect.poll(async () => (await getDoc(page)).photos[2].crop.x).not.toBe(crop0);
+});

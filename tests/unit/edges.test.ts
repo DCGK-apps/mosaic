@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beginEdgeDrag, dragFrac, junctions, minCellMm, minExtent, snapTo } from '../../src/core/edges';
+import { beginEdgeDrag, cellEdge, dragFrac, junctions, minCellMm, minExtent, snapTo } from '../../src/core/edges';
 import { computeLayout } from '../../src/core/geometry';
 import { leaf, split } from './helpers';
 
@@ -76,5 +76,27 @@ describe('edges', () => {
     const jc = junctions(computeLayout(cols, sheet));
     expect(jc).toHaveLength(1);
     expect(jc[0]!.horizontal.toSorted()).toEqual(['l', 'r']);
+  });
+
+  it('cellEdge: the edge of a photo nearer to the finger, along the drag', () => {
+    // a | b over c | d, columns at different places.
+    const tree = split('rows', 'H', 0.5, split('top', 'V', 0.4, leaf('a'), leaf('b')), split('bottom', 'V', 0.6, leaf('c'), leaf('d')));
+    const layout = computeLayout(tree, sheet);
+    const cell = (id: string) => layout.cells.find((c) => c.leafId === id)!;
+    const b = cell('b');
+    // Sideways in b: its only vertical edge is on the left (the right one is the sheet border).
+    expect(cellEdge(layout, b, 'V', { x: b.x + b.w - 1, y: b.y + 5 })!.splitId).toBe('top');
+    // Up/down in b: the edge below it.
+    expect(cellEdge(layout, b, 'H', { x: b.x + 5, y: b.y + 1 })!.splitId).toBe('rows');
+    // Up/down in a cell spanning the whole height: nothing to move.
+    const cols = split('s', 'V', 0.5, leaf('l'), leaf('r'));
+    const l2 = computeLayout(cols, sheet);
+    expect(cellEdge(l2, l2.cells[0]!, 'H', { x: 5, y: 5 })).toBeNull();
+    // Middle of three columns: the nearer side wins.
+    const three = split('s1', 'V', 1 / 3, leaf('x'), split('s2', 'V', 0.5, leaf('y'), leaf('z')));
+    const l3 = computeLayout(three, sheet);
+    const y = l3.cells.find((c) => c.leafId === 'y')!;
+    expect(cellEdge(l3, y, 'V', { x: y.x + 2, y: 10 })!.splitId).toBe('s1');
+    expect(cellEdge(l3, y, 'V', { x: y.x + y.w - 2, y: 10 })!.splitId).toBe('s2');
   });
 });

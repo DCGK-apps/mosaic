@@ -146,3 +146,19 @@ export function junctions(layout: Layout): Junction[] {
   }
   return out;
 }
+
+/**
+ * The edge of `cell` that a drag inside it moves: along `dir` ('V' – a vertical
+ * edge, moved sideways), the side nearer to the point `at` (mm); the other side
+ * when the near one is the border of the sheet. Null when the cell has no
+ * such edge (e.g. it spans the whole width).
+ */
+export function cellEdge(layout: Layout, cell: { x: number; y: number; w: number; h: number }, dir: Dir, at: { x: number; y: number }): DividerBox | null {
+  const eps = 0.01;
+  const along = (d: DividerBox) => (dir === 'V' ? d.y < cell.y + cell.h - eps && d.y + d.h > cell.y + eps : d.x < cell.x + cell.w - eps && d.x + d.w > cell.x + eps);
+  const before = layout.dividers.find((d) => d.dir === dir && along(d) && Math.abs((dir === 'V' ? d.x + d.w - cell.x : d.y + d.h - cell.y)) < eps) ?? null;
+  const after = layout.dividers.find((d) => d.dir === dir && along(d) && Math.abs((dir === 'V' ? d.x - (cell.x + cell.w) : d.y - (cell.y + cell.h))) < eps) ?? null;
+  if (!before || !after) return before ?? after;
+  const p = dir === 'V' ? at.x - cell.x : at.y - cell.y;
+  return p < (dir === 'V' ? cell.w : cell.h) / 2 ? before : after;
+}

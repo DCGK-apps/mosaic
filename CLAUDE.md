@@ -42,7 +42,7 @@ src/core/          czysta logika (testy w tests/unit)
   crop.ts tree.ts  kadrowanie; operacje na drzewie (setFrac ma tylko bezpieczne granice 1–99%)
   restructure.ts   isolateSegment / joinLine: przebudowa drzewa bez zmiany prostokątów pól, tak by chwycona część
                    przeciętej krawędzi była osobnym podziałem (obroty drzewa + refit ułamków z uwzględnieniem odstępu)
-  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, junctions (krzyżyki „+”)
+  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, junctions (krzyżyki „+”), cellEdge (krawędź zdjęcia dla trybu Układ)
   history.ts       undo/redo; przeciąganie = `preview` (transient) + `end` → jeden krok
   export.ts        drawMosaic (canvas, na końcu drawTexts), canvasMeasure, exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
@@ -109,8 +109,11 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 
 ### Krawędzie (przeciąganie, krzyżyki)
 
-Dwa sposoby chwytania (`useEdgeDrag` w `SheetView`, nasłuch na `window`, bo przebudowa drzewa podmienia elementy):
+Przełącznik narzędzi `ToolSwitch` (lewy górny róg płótna, także na telefonie; testid `tool-crop` / `tool-edges` / `tool-swap`, stan `tool` w `App`) decyduje, co robi przeciągnięcie zdjęcia: **Kadr** (kadrowanie, krawędzie i kropki też działają), **Układ** (zdjęcie nie kadruje się; przeciągnięcie w dowolnym miejscu zdjęcia rusza jego krawędź bliższą palcowi w osi ruchu – `cellEdge`; uchwyty widoczne, kropki większe), **Zamiana**. Na telefonie trafianie w cienkie krawędzie było zbyt trudne – stąd tryb Układ.
+
+Sposoby chwytania (`useEdgeDrag` w `SheetView`, nasłuch na `window`, bo przebudowa drzewa podmienia elementy):
 - **Krawędź** (`Divider`, kursor ↔/↕): rusza się tylko ten odcinek. Przy pierwszym ruchu `isolateSegment` tnie krawędź w każdym krzyżyku, gdzie prostopadła linia przechodzi na drugą stronę w tej samej pozycji (±0,01 mm). Chwycona część zachowuje `splitId`, druga dostaje `{id}~n`.
+- **Zdjęcie w trybie Układ** (`onGrabCell`): kierunek pierwszego ruchu wybiera oś, potem jak przy krawędzi (tylko odcinek przy tym zdjęciu).
 - **Krzyżyk** (`JunctionKnob`, testid `junction`, kursor `move`, kropka): `junctions(layout)` znajduje tylko „+” (nie T). Kierunek pierwszego ruchu (4 px) wybiera linię: w bok → pionowa, w górę/dół → pozioma. `joinLine` łączy części w jednej linii w jeden podział (najwyższy prostopadły przodek, przez który linia przechodzi), więc rusza się najdłuższa spójna linia.
 - Akcje `isolate` / `joinLine` i `setFrac` są `transient` – całe przeciągnięcie to jeden krok cofania. Obraz w chwili przebudowy się nie zmienia (`refit` liczy ułamki z prostokątów pól, z odstępem).
 - Zakres: żadne pole nie spada poniżej `minCellMm` (15 mm, na małych arkuszach 6% krótszego boku), przy proporcjonalnym skalowaniu zagnieżdżonych podziałów. Zakres zawsze obejmuje pozycję startową, więc nic nie skacze.

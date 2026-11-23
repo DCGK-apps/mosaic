@@ -55,7 +55,7 @@ test('zoom buttons and the mouse wheel magnify the photo (100–300%)', async ({
 
 test('swap mode: dragging a photo onto another swaps them', async ({ page }) => {
   const before = await shownPhotos(page);
-  await inPanel(page, () => page.getByTestId('tool-swap').click());
+  await page.getByTestId('tool-swap').click();
   await expect(dividers(page)).toHaveCount(0);
   const a = center(await box(cells(page).nth(0)));
   const c = center(await box(cells(page).nth(2)));
