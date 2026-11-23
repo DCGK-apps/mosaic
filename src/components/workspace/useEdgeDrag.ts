@@ -58,6 +58,14 @@ export function useEdgeDrag(params: Params): {
     if (!rect || scale <= 0) return;
     const at = { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
     const pointerId = e.pointerId;
+    // The grabbed knob or edge may be re-rendered or replaced while the layout
+    // changes; a phone ends the touch when its element leaves the page. The
+    // sheet stays, so the pointer is held by the sheet for the whole drag.
+    try {
+      sheetRef.current?.setPointerCapture(pointerId);
+    } catch {
+      /* the pointer is already gone */
+    }
     const origin = { x: e.clientX, y: e.clientY };
     let chosen = pick(null, at);
     let drag: EdgeDrag | null = null;

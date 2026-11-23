@@ -192,3 +192,23 @@ test('moving a line leaves the other lines where they are (3×3 grid, knob)', as
   expect(after[0]).toBeGreaterThan(first! + 20);
   expect(after[1]).toBe(second);
 });
+
+test('touch: a long knob drag goes on smoothly – the knob is not replaced mid-drag', async ({ page }, info) => {
+  test.skip(!info.project.use.hasTouch, 'touch-only');
+  await page.getByTestId('tool-edges').click();
+  await page.getByTestId('junction').first().evaluate((el) => ((window as unknown as { knob: Element }).knob = el));
+  const k = await box(page.getByTestId('junction').first());
+  const c = { x: k.x + k.width / 2, y: k.y + k.height / 2 };
+  const before = await cellBoxes(page);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [c] });
+  for (let i = 1; i <= 25; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: c.x, y: c.y + i * 3 }] });
+  }
+  expect(await page.evaluate(() => (window as unknown as { knob: Element }).knob.isConnected)).toBe(true);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  // The whole horizontal line followed the finger all the way (75 px).
+  const after = await cellBoxes(page);
+  expect(after[0]!.height - before[0]!.height).toBeGreaterThan(65);
+  expect(after[1]!.height - before[1]!.height).toBeGreaterThan(65);
+});

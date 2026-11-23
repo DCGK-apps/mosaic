@@ -139,9 +139,10 @@ export function SheetView({ mosaic, width, height, tool, selectedText, onSelectT
           <Divider key={d.splitId} divider={d} scale={scale} active={edges.active === d.splitId} shown={edgesMode} onGrab={edges.onGrabEdge} />
         ))}
       {!swapMode &&
-        crossings.map((j) => (
+        crossings.map((j, i) => (
           <JunctionKnob
-            key={`${j.x.toFixed(2)}:${j.y.toFixed(2)}`}
+            // By index: a knob that moves with its line keeps its element.
+            key={i}
             junction={j}
             scale={scale}
             large={edgesMode}
