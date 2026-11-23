@@ -19,11 +19,11 @@ test('dragging a divider resizes the neighbouring photos; undo restores it in on
   await expect(undoButton(page)).toBeEnabled(); // the layout change before is still there
 });
 
-test('a divider stops at 10% / 90%', async ({ page }) => {
+test('a divider stops before a photo gets narrower than 15 mm', async ({ page }) => {
   const d = center(await box(dividers(page, 'V').first()));
   await mouseDrag(page, d, { x: 0, y: d.y });
-  const split = (await getDoc(page)).tree;
-  expect(split.frac).toBeCloseTo(0.1);
+  const { tree, sheet } = await getDoc(page);
+  expect(tree.frac * (sheet.widthMm - sheet.gapMm)).toBeCloseTo(15, 1);
 });
 
 test('dragging a photo moves the crop, never leaving an empty gap', async ({ page }) => {

@@ -11,10 +11,10 @@ describe('tree', () => {
     expect(leaves(null)).toEqual([]);
   });
 
-  it('sets a divider position within 10–90%', () => {
+  it('sets a divider position within 1–99%', () => {
     expect(splits(setFrac(tree, 's2', 0.6))[1]!.frac).toBe(0.6);
-    expect(splits(setFrac(tree, 's2', 0.01))[1]!.frac).toBe(0.1);
-    expect(clampFrac(2)).toBe(0.9);
+    expect(splits(setFrac(tree, 's2', 0.001))[1]!.frac).toBe(0.01);
+    expect(clampFrac(2)).toBe(0.99);
   });
 
   it('reuses untouched subtrees and returns the same tree when nothing changes', () => {

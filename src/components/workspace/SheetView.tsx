@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { currentTree } from '../../core/doc';
 import { computeLayout } from '../../core/geometry';
 import { layoutText, type TextBox } from '../../core/text';
@@ -8,6 +8,7 @@ import type { Mosaic } from '../../hooks/useMosaic';
 import { Cell } from './Cell';
 import { Divider } from './Divider';
 import { TextFrame, TextItem } from './TextItem';
+import { useEdgeDrag } from './useEdgeDrag';
 
 interface Props {
   mosaic: Mosaic;
@@ -86,13 +87,16 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
   }, [dragging, act]);
 
   const onCrop = useCallback((photoId: string, crop: Crop, transient: boolean) => act({ type: 'setCrop', photoId, crop }, { transient }), [act]);
-  const onFrac = useCallback((splitId: string, frac: number) => act({ type: 'setFrac', splitId, frac }, { transient: true }), [act]);
   const onRemove = useCallback((photoId: string) => act({ type: 'toMagazine', photoId }), [act]);
+
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const edges = useEdgeDrag({ tree, sheet, layout, scale, sheetRef, act, endGesture });
 
   const dragPhoto = drag && layout.cells.find((c) => c.leafId === drag.from);
 
   return (
     <div
+      ref={sheetRef}
       data-testid="sheet"
       className="relative shadow-2xl"
       style={{ width: sheet.widthMm * scale, height: sheet.heightMm * scale, backgroundColor: sheet.frameColor }}
@@ -124,7 +128,9 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
           />
         );
       })}
-      {!swapMode && layout.dividers.map((d) => <Divider key={d.splitId} divider={d} scale={scale} onMove={onFrac} onEnd={endGesture} />)}
+      {!swapMode && layout.dividers.map((d) => (
+          <Divider key={d.splitId} divider={d} scale={scale} active={edges.active === d.splitId} onGrab={edges.onGrab} />
+        ))}
       {texts.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" data-testid="text-layer">
           {texts.map((t) => (

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { currentTree, docReducer, emptyDoc, MAX_GAP_MM, type DocAction } from '../../src/core/doc';
 import { leaves, splits } from '../../src/core/tree';
 import type { Doc } from '../../src/core/types';
-import { photo } from './helpers';
+import { leaf, photo, split as splitNode } from './helpers';
 
 const run = (doc: Doc, ...actions: DocAction[]) => actions.reduce(docReducer, doc);
 const shown = (doc: Doc) => leaves(currentTree(doc)).map((l) => l.photoId).toSorted();
@@ -50,6 +50,15 @@ describe('docReducer', () => {
     const next = run(doc, { type: 'setFrac', splitId: split.id, frac: 0.7 });
     expect(splits(currentTree(next))[0]!.frac).toBe(0.7);
     expect(next.autoHistory[0]).toBe(doc.autoHistory[0]);
+  });
+
+  it('isolating part of a crossed edge keeps the cells and stays in the current layout', () => {
+    const doc = withPhotos(4, 'grid');
+    const tree = splitNode('rows', 'H', 0.5, splitNode('top', 'V', 0.5, leaf('a', 'p0'), leaf('b', 'p1')), splitNode('bottom', 'V', 0.5, leaf('c', 'p2'), leaf('d', 'p3')));
+    const next = run({ ...doc, tree }, { type: 'isolate', splitId: 'rows', x: 10, y: doc.sheet.heightMm / 2, tolMm: 1 });
+    expect(next.tree).not.toBe(tree);
+    expect(next.tree!.kind === 'split' && next.tree!.dir).toBe('V');
+    expect(leaves(next.tree).map((l) => l.photoId).toSorted()).toEqual(['p0', 'p1', 'p2', 'p3']);
   });
 
   it('putting a photo aside keeps the rest of an auto layout; restoring brings it back', () => {

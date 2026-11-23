@@ -18,8 +18,9 @@ function mapTree(node: Node, fn: (n: Node) => Node): Node {
   return fn(a === node.a && b === node.b ? node : { ...node, a, b });
 }
 
-export const MIN_FRAC = 0.1;
-export const MAX_FRAC = 0.9;
+/** Safety bounds only – while dragging, the limit is a minimum cell size in mm (edges.ts). */
+export const MIN_FRAC = 0.01;
+export const MAX_FRAC = 0.99;
 
 export function clampFrac(frac: number): number {
   return Math.min(MAX_FRAC, Math.max(MIN_FRAC, frac));

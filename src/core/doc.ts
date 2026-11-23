@@ -2,6 +2,7 @@ import { clampSide } from './formats';
 import { autoLayout, fixedLayout } from './layouts';
 import { createRng } from './random';
 import { cleanText, type TextBox } from './text';
+import { isolateSegment } from './restructure';
 import { leaves, removePhoto, setFrac, swapLeaves } from './tree';
 import type { Crop, Doc, LayoutMode, Node, Photo, Sheet } from './types';
 
@@ -28,6 +29,8 @@ export type DocAction =
   | { type: 'shuffle'; seed: number }
   | { type: 'autoStep'; delta: number }
   | { type: 'setFrac'; splitId: string; frac: number }
+  /** Same picture, but the part of the edge under (x, y) mm becomes a divider of its own (see restructure.ts). */
+  | { type: 'isolate'; splitId: string; x: number; y: number; tolMm: number }
   | { type: 'swap'; leafA: string; leafB: string }
   | { type: 'setCrop'; photoId: string; crop: Crop }
   | { type: 'setSheet'; patch: Partial<Sheet> }
@@ -115,6 +118,13 @@ export function docReducer(doc: Doc, action: DocAction): Doc {
       const tree = currentTree(doc);
       if (!tree) return doc;
       const next = setFrac(tree, action.splitId, action.frac);
+      return next === tree ? doc : withTree(doc, next);
+    }
+
+    case 'isolate': {
+      const tree = currentTree(doc);
+      if (!tree) return doc;
+      const next = isolateSegment(tree, doc.sheet, action.splitId, { x: action.x, y: action.y }, action.tolMm);
       return next === tree ? doc : withTree(doc, next);
     }
 
