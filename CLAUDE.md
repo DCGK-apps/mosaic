@@ -40,7 +40,7 @@ src/core/          czysta logika (testy w tests/unit)
   text.ts          napisy: FONTS, newTextBox, cleanText, layoutText (linie w mm – WSPÓLNE dla podglądu
                    i eksportu; pomiar przez Measure = canvas measureText), fontCss, moveText, snapAngle
   crop.ts tree.ts  kadrowanie; operacje na drzewie (setFrac ma tylko bezpieczne granice 1–99%)
-  restructure.ts   isolateSegment: przebudowa drzewa bez zmiany prostokątów pól, tak by chwycona część
+  restructure.ts   isolateSegment / joinLine: przebudowa drzewa bez zmiany prostokątów pól, tak by chwycona część
                    przeciętej krawędzi była osobnym podziałem (obroty drzewa + refit ułamków z uwzględnieniem odstępu)
   edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, dividersAt
   history.ts       undo/redo; przeciąganie = `preview` (transient) + `end` → jeden krok
@@ -108,7 +108,7 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 ### Krawędzie (przeciąganie, krzyżyki)
 
 - `Divider` tylko zgłasza chwycenie. `useEdgeDrag` (w `SheetView`) sam wybiera krawędź z geometrii (`dividersAt`). W krzyżyku czeka na pierwszy ruch (4 px), a kierunek decyduje, którą krawędź chwycono. Nasłuch jest na `window`, bo przebudowa drzewa może zmienić elementy.
-- Przy pierwszym ruchu `isolateSegment` tnie krawędź w każdym krzyżyku (miejscu, gdzie prostopadła linia przechodzi na drugą stronę w tej samej pozycji, ±0,01 mm). Chwycona część zachowuje `splitId`, druga dostaje `{id}~n`. Gdy punkt leży w krzyżyku (±4 px), nic nie jest cięte i rusza się cała krawędź. Akcja `isolate` i `setFrac` są `transient`, więc całe przeciągnięcie to jeden krok cofania.
+- Przy pierwszym ruchu `isolateSegment` tnie krawędź w każdym krzyżyku (miejscu, gdzie prostopadła linia przechodzi na drugą stronę w tej samej pozycji, ±0,01 mm). Chwycona część zachowuje `splitId`, druga dostaje `{id}~n`. Gdy punkt leży w krzyżyku (±4 px myszą, ±10 px palcem), `joinLine` łączy części w jednej linii w jeden podział (odwrotność cięcia) i rusza się cała linia. Akcja `isolate` i `setFrac` są `transient`, więc całe przeciągnięcie to jeden krok cofania.
 - Zakres: żadne pole nie spada poniżej `minCellMm` (15 mm, na małych arkuszach 6% krótszego boku), przy proporcjonalnym skalowaniu zagnieżdżonych podziałów. Zakres zawsze obejmuje pozycję startową, więc nic nie skacze.
 - Przyciąganie (8 px, Shift wyłącza): inne krawędzie w tym samym kierunku (poza tymi, które przesuwają się razem z nią), środek arkusza, połowa własnego obszaru.
 - E2E: `tests/e2e/edges.spec.ts`. Uwaga: przyciski zoomu komórki leżą nad krawędzią w prawej części pola, więc test dotykowy chwyta krawędź bliżej środka.

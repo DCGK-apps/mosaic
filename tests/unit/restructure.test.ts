@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeLayout } from '../../src/core/geometry';
-import { isolateSegment } from '../../src/core/restructure';
+import { isolateSegment, joinLine } from '../../src/core/restructure';
 import { setFrac } from '../../src/core/tree';
 import type { Node } from '../../src/core/types';
 import { leaf, split } from './helpers';
@@ -122,5 +122,28 @@ describe('isolateSegment', () => {
     const before = rects(tree);
     for (const id of ['a', 'b', 'd']) expectClose(moved[id], before[id]);
     expect(moved.c![2]).toBeLessThan(before.c![2]!);
+  });
+
+  it('on the crossing, parts in line are joined back: the whole line moves', () => {
+    const h = divider(cross, 'rows');
+    const v = divider(cross, 'top');
+    const cut = isolateSegment(cross, sheet, 'rows', { x: 20, y: h.y + 3 });
+    expect(divider(cut, 'rows').w).toBeLessThan(200);
+    // Grab the left part right at the crossing (its end): the full line comes back.
+    const joined = isolateSegment(cut, sheet, 'rows', { x: v.x + 1, y: h.y + 3 }, 2);
+    expectSamePicture(cross, joined);
+    const line = divider(joined, 'rows');
+    expect(line.x).toBeCloseTo(0);
+    expect(line.w).toBeCloseTo(300);
+    expect(computeLayout(joined, sheet).dividers.filter((d) => d.dir === 'H')).toHaveLength(1);
+    const moved = rects(setFrac(joined, 'rows', 0.3));
+    const before = rects(cross);
+    for (const id of ['a', 'b']) expect(moved[id]![3]).toBeLessThan(before[id]![3]!);
+  });
+
+  it('joinLine leaves lines that are not in line alone', () => {
+    const t = split('cols', 'V', 0.5, split('l', 'H', 0.3, leaf('a'), leaf('b')), split('r', 'H', 0.6, leaf('c'), leaf('d')));
+    expect(joinLine(t, sheet, 'l')).toBe(t);
+    expect(joinLine(cross, sheet, 'rows')).toBe(cross);
   });
 });

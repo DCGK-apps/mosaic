@@ -9,7 +9,7 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 - **Krawędzie** między zdjęciami można przeciągać (myszą i palcem):
   - krawędź przyciąga się do innych krawędzi w jednej linii i do środka arkusza (Shift – bez przyciągania), więc łatwo zrobić „krzyżyk”,
   - gdy krawędzie tworzą krzyżyk, każdą część przeciętej linii można przesuwać osobno, np. tylko lewą połowę linii poziomej. Układ przebudowuje się w locie, a nic nie przeskakuje,
-  - chwycenie w samym krzyżyku nie dzieli linii, a kierunek ruchu wybiera, czy przesuwasz krawędź pionową, czy poziomą,
+  - chwycenie w samym krzyżyku przesuwa całą linię (także złożoną wcześniej z osobno przesuwanych części, jeśli znów są w jednej linii), a kierunek ruchu wybiera, czy pionową, czy poziomą,
   - pole nie robi się węższe niż 15 mm (na małych arkuszach mniej).
 - **Kadrowanie:** przeciąganie zdjęcia, powiększanie przyciskami, kółkiem myszy lub szczypaniem. Zdjęcie zawsze wypełnia pole, nie da się zrobić pustej dziury.
 - **Napisy:** przycisk „Dodaj napis” nad arkuszem. Napis z polskimi znakami, w kilku liniach, można dowolnie przesuwać, powiększać (kółko w rogu) i obracać (uchwyt u góry, przyciąga do 0°/45°/90°). Pasek pod arkuszem: 7 czcionek (Roboto, Lora, Playfair Display, Oswald, Caveat, Pacifico, Comfortaa – wbudowane, działają offline i wyglądają tak samo na każdym urządzeniu), rozmiar w mm wydruku, pogrubienie, kursywa, podkreślenie, wyrównanie, cień, kolor. Dwuklik na napisie – edycja treści, Delete – usunięcie. Napisy są w eksporcie, projekcie `.mosaic` i autozapisie.

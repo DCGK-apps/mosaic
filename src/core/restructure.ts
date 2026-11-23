@@ -140,12 +140,58 @@ function touching(d: DividerBox, dividers: readonly DividerBox[]): DividerBox[] 
   });
 }
 
+/** Perpendicular dividers whose band touches `d`'s band: crossing it, ending on it, or where `d` ends. */
+function adjoining(d: DividerBox, dividers: readonly DividerBox[]): DividerBox[] {
+  const eps = ALIGN_EPS_MM;
+  const touch = (a0: number, a1: number, b0: number, b1: number) => a1 >= b0 - eps && a0 <= b1 + eps;
+  return dividers.filter((c) => c.dir !== d.dir && touch(c.x, c.x + c.w, d.x, d.x + d.w) && touch(c.y, c.y + c.h, d.y, d.y + d.h));
+}
+
+function pathTo(n: Node, id: string): Split[] | null {
+  if (n.id === id) return [];
+  if (n.kind === 'leaf') return null;
+  const below = pathTo(n.a, id) ?? pathTo(n.b, id);
+  return below ? [n, ...below] : null;
+}
+
+/**
+ * Join split `splitId` with the parts in line with it into one divider, as long
+ * as the line runs straight across crossings (the inverse of cutting it). The
+ * picture does not change. Returns the same tree when there is nothing to join.
+ */
+export function joinLine(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, newId?: () => string): Node {
+  const s = find(tree, splitId);
+  const path = pathTo(tree, splitId);
+  if (!s || s.kind !== 'split' || !path) return tree;
+  const ids = allIds(tree);
+  let counter = 0;
+  const fresh =
+    newId ??
+    ((): string => {
+      let id: string;
+      do id = `${splitId}~${++counter}`;
+      while (ids.has(id));
+      ids.add(id);
+      return id;
+    });
+  const layout = computeLayout(tree, sheet);
+  const rects = new Map(layout.cells.map((c) => [c.leafId, c as Rect]));
+  // The highest perpendicular ancestor the line runs across gives the longest line.
+  for (const ancestor of path) {
+    if (ancestor.dir === s.dir) continue;
+    const raised = raise(ancestor, splitId, rects, fresh);
+    if (raised) return refit(replace(tree, ancestor.id, raised), rects, Math.max(0, sheet.gapMm));
+  }
+  return tree;
+}
+
 /**
  * Make the part of divider `splitId` under the point `at` (mm of the sheet) a
  * divider of its own: the line is cut at every place where another line crosses
  * it. The picture does not change. The part under the point keeps `splitId`, so
- * the drag can go on with the same id. Nothing is cut when the point lies on a
- * crossing (within `tolMm`) – there the whole line moves.
+ * the drag can go on with the same id. When the point lies on a crossing
+ * (within `tolMm`), the whole line moves instead: the parts in line with it are
+ * joined into one divider (`joinLine`).
  */
 export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, at: { x: number; y: number }, tolMm = 0): Node {
   const ids = allIds(tree);
@@ -158,6 +204,14 @@ export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heigh
     return id;
   };
   const gap = Math.max(0, sheet.gapMm);
+  const start = computeLayout(tree, sheet).dividers;
+  const first = start.find((x) => x.splitId === splitId);
+  if (!first) return tree;
+  const alongFirst = first.dir === 'H' ? at.x : at.y;
+  const atCrossing = adjoining(first, start).some((c) =>
+    first.dir === 'H' ? alongFirst >= c.x - tolMm && alongFirst <= c.x + c.w + tolMm : alongFirst >= c.y - tolMm && alongFirst <= c.y + c.h + tolMm,
+  );
+  if (atCrossing) return joinLine(tree, sheet, splitId, newId);
   let current = tree;
   let id = splitId;
   for (let guard = 0; guard < 64; guard++) {
@@ -175,10 +229,8 @@ export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heigh
       const raised = raise(s, c.splitId, rects, newId);
       if (!raised || raised.kind !== 'split') continue;
       // The line is now two splits, one on each side of the crossing line.
-      const first = raised.a as Split;
-      const second = raised.b as Split;
       const cut = linePos(raised, rects);
-      const mine = (d.dir === 'H' ? at.x : at.y) < cut ? first : second;
+      const mine = ((d.dir === 'H' ? at.x : at.y) < cut ? raised.a : raised.b) as Split;
       next = { tree: refit(replace(current, s.id, raised), rects, gap), id: mine.id };
       break;
     }
