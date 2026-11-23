@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beginEdgeDrag, dividersAt, dragFrac, minCellMm, minExtent, snapTo } from '../../src/core/edges';
+import { beginEdgeDrag, dragFrac, junctions, minCellMm, minExtent, snapTo } from '../../src/core/edges';
 import { computeLayout } from '../../src/core/geometry';
 import { leaf, split } from './helpers';
 
@@ -58,14 +58,23 @@ describe('edges', () => {
     expect(snapTo(150, drag.targets, 2)).toBe(150);
   });
 
-  it('finds the edges under a point, including at a crossing', () => {
-    const tree = split('rows', 'H', 0.5, split('top', 'V', 0.4, leaf('a'), leaf('b')), split('bottom', 'V', 0.4, leaf('c'), leaf('d')));
-    const layout = computeLayout(tree, sheet);
-    const h = layout.dividers.find((d) => d.splitId === 'rows')!;
-    const v = layout.dividers.find((d) => d.splitId === 'top')!;
-    const cross = dividersAt(layout, v.x + v.w / 2, h.y + h.h / 2, 4).map((d) => d.splitId);
-    expect(cross).toEqual(expect.arrayContaining(['rows', 'top', 'bottom']));
-    expect(dividersAt(layout, 20, h.y + h.h / 2, 4).map((d) => d.splitId)).toEqual(['rows']);
-    expect(dividersAt(layout, 20, 20, 4)).toEqual([]);
+  it('finds crossings (+), not T-junctions', () => {
+    const cross = split('rows', 'H', 0.5, split('top', 'V', 0.4, leaf('a'), leaf('b')), split('bottom', 'V', 0.4, leaf('c'), leaf('d')));
+    const js = junctions(computeLayout(cross, sheet));
+    expect(js).toHaveLength(1);
+    expect(js[0]!.vertical.toSorted()).toEqual(['bottom', 'top']);
+    expect(js[0]!.horizontal).toEqual(['rows']);
+    const v = computeLayout(cross, sheet).dividers.find((d) => d.splitId === 'top')!;
+    expect(js[0]!.x).toBeCloseTo(v.x);
+    // Not in line: two T-junctions, no crossing.
+    const ts = split('rows', 'H', 0.5, split('top', 'V', 0.4, leaf('a'), leaf('b')), split('bottom', 'V', 0.6, leaf('c'), leaf('d')));
+    expect(junctions(computeLayout(ts, sheet))).toEqual([]);
+    // Also without a gap.
+    expect(junctions(computeLayout(cross, { ...sheet, gapMm: 0 }))).toHaveLength(1);
+    // Columns cut into rows at the same height: a crossing made of four parts.
+    const cols = split('cols', 'V', 0.5, split('l', 'H', 0.3, leaf('a'), leaf('b')), split('r', 'H', 0.3, leaf('c'), leaf('d')));
+    const jc = junctions(computeLayout(cols, sheet));
+    expect(jc).toHaveLength(1);
+    expect(jc[0]!.horizontal.toSorted()).toEqual(['l', 'r']);
   });
 });

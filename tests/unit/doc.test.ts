@@ -55,10 +55,13 @@ describe('docReducer', () => {
   it('isolating part of a crossed edge keeps the cells and stays in the current layout', () => {
     const doc = withPhotos(4, 'grid');
     const tree = splitNode('rows', 'H', 0.5, splitNode('top', 'V', 0.5, leaf('a', 'p0'), leaf('b', 'p1')), splitNode('bottom', 'V', 0.5, leaf('c', 'p2'), leaf('d', 'p3')));
-    const next = run({ ...doc, tree }, { type: 'isolate', splitId: 'rows', x: 10, y: doc.sheet.heightMm / 2, tolMm: 1 });
+    const next = run({ ...doc, tree }, { type: 'isolate', splitId: 'rows', x: 10, y: doc.sheet.heightMm / 2 });
     expect(next.tree).not.toBe(tree);
     expect(next.tree!.kind === 'split' && next.tree!.dir).toBe('V');
     expect(leaves(next.tree).map((l) => l.photoId).toSorted()).toEqual(['p0', 'p1', 'p2', 'p3']);
+    // …and joining it back gives the whole line again.
+    const joined = run(next, { type: 'joinLine', splitId: 'rows' });
+    expect(joined.tree!.kind === 'split' && joined.tree!.dir).toBe('H');
   });
 
   it('putting a photo aside keeps the rest of an auto layout; restoring brings it back', () => {

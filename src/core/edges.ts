@@ -101,26 +101,48 @@ export function dragFrac(drag: EdgeDrag, deltaMm: number, snapMm: number): numbe
   return (p - drag.origin) / drag.available;
 }
 
-/**
- * Dividers under a point (mm). Each one can be grabbed `halfMm` beyond its band
- * on both sides, and at its ends also across a perpendicular band, so a line
- * that ends at a crossing can still be picked right there.
- */
-export function dividersAt(layout: Layout, x: number, y: number, halfMm: number): DividerBox[] {
-  return layout.dividers.filter((d) => {
-    const vertical = d.dir === 'V';
-    const band = vertical ? d.w : d.h;
-    const across = Math.max(halfMm, band / 2);
-    const along = (vertical ? d.h : d.w) / 2 + halfMm + band;
-    const dx = Math.abs(x - (d.x + d.w / 2));
-    const dy = Math.abs(y - (d.y + d.h / 2));
-    return vertical ? dx <= across && dy <= along : dy <= across && dx <= along;
-  });
+export interface Junction {
+  /** Where the bands of the crossing lines overlap, in mm. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Dividers that make up the vertical and the horizontal line here. */
+  vertical: string[];
+  horizontal: string[];
 }
 
-/** Distance from a point to the divider's band (0 inside). */
-export function distanceTo(d: DividerBox, x: number, y: number): number {
-  const dx = Math.max(d.x - x, 0, x - (d.x + d.w));
-  const dy = Math.max(d.y - y, 0, y - (d.y + d.h));
-  return Math.hypot(dx, dy);
+/**
+ * Crossings: places where a vertical and a horizontal line both go on to the
+ * other side ("+"). Grabbed there, the whole line moves (joinLine). T-junctions
+ * are not crossings – a line ending on another one is just one edge.
+ */
+export function junctions(layout: Layout): Junction[] {
+  const eps = 0.01;
+  const vs = layout.dividers.filter((d) => d.dir === 'V');
+  const hs = layout.dividers.filter((d) => d.dir === 'H');
+  const out: Junction[] = [];
+  const seen = new Set<string>();
+  for (const v of vs) {
+    for (const h of hs) {
+      // The bands must touch or overlap.
+      if (v.x > h.x + h.w + eps || v.x + v.w < h.x - eps || h.y > v.y + v.h + eps || h.y + h.h < v.y - eps) continue;
+      const x0 = v.x;
+      const x1 = v.x + v.w;
+      const y0 = h.y;
+      const y1 = h.y + h.h;
+      const key = `${x0.toFixed(3)}:${y0.toFixed(3)}`;
+      if (seen.has(key)) continue;
+      const vLine = vs.filter((d) => Math.abs(d.x - x0) < eps && d.y <= y1 + eps && d.y + d.h >= y0 - eps);
+      const hLine = hs.filter((d) => Math.abs(d.y - y0) < eps && d.x <= x1 + eps && d.x + d.w >= x0 - eps);
+      const up = vLine.some((d) => d.y < y0 - eps);
+      const down = vLine.some((d) => d.y + d.h > y1 + eps);
+      const left = hLine.some((d) => d.x < x0 - eps);
+      const right = hLine.some((d) => d.x + d.w > x1 + eps);
+      if (!(up && down && left && right)) continue;
+      seen.add(key);
+      out.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0, vertical: vLine.map((d) => d.splitId), horizontal: hLine.map((d) => d.splitId) });
+    }
+  }
+  return out;
 }

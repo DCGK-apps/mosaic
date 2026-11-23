@@ -64,17 +64,28 @@ test('an edge snaps to the one in line with it (Shift: no snapping)', async ({ p
   expect(doc.tree.a.frac).not.toBe(doc.tree.b.frac);
 });
 
-test('at the crossing the whole line moves – the direction of the drag picks which one', async ({ page }) => {
-  const h = await horizontal(page);
-  const v = await box(dividers(page, 'V').first());
-  const cross = { x: v.x + v.width / 2, y: h.y + h.height / 2 };
+const knob = (page: Page) => page.getByTestId('junction');
+const knobCenter = async (page: Page) => {
+  const b = await box(knob(page));
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+};
+
+test('a crossing has a knob with the "move" cursor; edges have resize cursors', async ({ page }) => {
+  await expect(knob(page)).toHaveCount(1);
+  await expect(knob(page)).toHaveCSS('cursor', 'move');
+  await expect(dividers(page, 'H').first()).toHaveCSS('cursor', 'row-resize');
+  await expect(dividers(page, 'V').first()).toHaveCSS('cursor', 'col-resize');
+});
+
+test('the knob moves the whole line – the direction of the drag picks which one', async ({ page }) => {
+  const cross = await knobCenter(page);
   const before = await cellBoxes(page);
   await mouseDrag(page, cross, { x: cross.x, y: cross.y + 40 });
   const down = await cellBoxes(page);
   // Both top photos taller, both bottom ones shorter.
   for (const i of [0, 1]) expect(down[i]!.height).toBeGreaterThan(before[i]!.height + 30);
   for (const i of [2, 3]) expect(down[i]!.height).toBeLessThan(before[i]!.height - 30);
-  const cross2 = { x: cross.x, y: cross.y + 40 };
+  const cross2 = await knobCenter(page);
   await mouseDrag(page, cross2, { x: cross2.x + 40, y: cross2.y });
   const side = await cellBoxes(page);
   // The whole vertical line moved: both left photos wider, heights unchanged.
@@ -82,24 +93,35 @@ test('at the crossing the whole line moves – the direction of the drag picks w
   for (const i of [0, 1, 2, 3]) expect(side[i]!.height).toBeCloseTo(down[i]!.height, 0);
 });
 
-test('after cutting, the parts brought back in line move together again from the crossing', async ({ page }) => {
+test('after cutting, the parts brought back in line move together again from the knob', async ({ page }) => {
   const h = await horizontal(page);
-  const v = await box(dividers(page, 'V').first());
   const left = { x: h.x + h.width * 0.2, y: h.y + h.height / 2 };
   // Cut: the left half goes down…
   await mouseDrag(page, left, { x: left.x, y: left.y + 40 });
   await expect(dividers(page, 'H')).toHaveCount(2);
+  await expect(knob(page)).toHaveCount(0); // not in line: no crossing
   // …and back up, snapping into line with the right half.
   await mouseDrag(page, { x: left.x, y: left.y + 40 }, { x: left.x, y: left.y + 2 });
   const inLine = await cellBoxes(page);
   expect(inLine[0]!.height).toBeCloseTo(inLine[1]!.height, 0);
-  // Grabbed at the crossing, the whole horizontal line moves.
-  const cross = { x: v.x + v.width / 2, y: left.y };
+  // The knob is back; grabbed there, the whole horizontal line moves.
+  await expect(knob(page)).toHaveCount(1);
+  const cross = await knobCenter(page);
   await mouseDrag(page, cross, { x: cross.x, y: cross.y + 40 });
   const after = await cellBoxes(page);
   for (const i of [0, 1]) expect(after[i]!.height).toBeGreaterThan(inLine[i]!.height + 30);
   expect(after[0]!.height).toBeCloseTo(after[1]!.height, 0);
   await expect(dividers(page, 'H')).toHaveCount(1);
+});
+
+test('touch: the knob moves the whole line', async ({ page }, info) => {
+  test.skip(!info.project.use.hasTouch, 'touch-only');
+  const before = await cellBoxes(page);
+  const c = await knobCenter(page);
+  await touchDrag(page, c, { x: c.x, y: c.y + 30 });
+  await expect.poll(async () => (await cellBoxes(page))[0]!.height).toBeGreaterThan(before[0]!.height + 20);
+  const after = await cellBoxes(page);
+  expect(after[1]!.height).toBeCloseTo(after[0]!.height, 0);
 });
 
 test('touch: a finger moves one half of a crossed edge', async ({ page }, info) => {

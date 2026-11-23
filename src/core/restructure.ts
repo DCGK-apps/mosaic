@@ -140,13 +140,6 @@ function touching(d: DividerBox, dividers: readonly DividerBox[]): DividerBox[] 
   });
 }
 
-/** Perpendicular dividers whose band touches `d`'s band: crossing it, ending on it, or where `d` ends. */
-function adjoining(d: DividerBox, dividers: readonly DividerBox[]): DividerBox[] {
-  const eps = ALIGN_EPS_MM;
-  const touch = (a0: number, a1: number, b0: number, b1: number) => a1 >= b0 - eps && a0 <= b1 + eps;
-  return dividers.filter((c) => c.dir !== d.dir && touch(c.x, c.x + c.w, d.x, d.x + d.w) && touch(c.y, c.y + c.h, d.y, d.y + d.h));
-}
-
 function pathTo(n: Node, id: string): Split[] | null {
   if (n.id === id) return [];
   if (n.kind === 'leaf') return null;
@@ -189,11 +182,10 @@ export function joinLine(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' |
  * Make the part of divider `splitId` under the point `at` (mm of the sheet) a
  * divider of its own: the line is cut at every place where another line crosses
  * it. The picture does not change. The part under the point keeps `splitId`, so
- * the drag can go on with the same id. When the point lies on a crossing
- * (within `tolMm`), the whole line moves instead: the parts in line with it are
- * joined into one divider (`joinLine`).
+ * the drag can go on with the same id. A point inside a crossing cuts nothing
+ * (moving the whole line from a crossing is `joinLine`).
  */
-export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, at: { x: number; y: number }, tolMm = 0): Node {
+export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, at: { x: number; y: number }): Node {
   const ids = allIds(tree);
   let counter = 0;
   const newId = (): string => {
@@ -204,14 +196,6 @@ export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heigh
     return id;
   };
   const gap = Math.max(0, sheet.gapMm);
-  const start = computeLayout(tree, sheet).dividers;
-  const first = start.find((x) => x.splitId === splitId);
-  if (!first) return tree;
-  const alongFirst = first.dir === 'H' ? at.x : at.y;
-  const atCrossing = adjoining(first, start).some((c) =>
-    first.dir === 'H' ? alongFirst >= c.x - tolMm && alongFirst <= c.x + c.w + tolMm : alongFirst >= c.y - tolMm && alongFirst <= c.y + c.h + tolMm,
-  );
-  if (atCrossing) return joinLine(tree, sheet, splitId, newId);
   let current = tree;
   let id = splitId;
   for (let guard = 0; guard < 64; guard++) {
@@ -221,7 +205,7 @@ export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heigh
     if (!d || !s || s.kind !== 'split') break;
     const meeting = touching(d, layout.dividers);
     const along = d.dir === 'H' ? at.x : at.y;
-    const onCrossing = meeting.some((c) => (d.dir === 'H' ? along >= c.x - tolMm && along <= c.x + c.w + tolMm : along >= c.y - tolMm && along <= c.y + c.h + tolMm));
+    const onCrossing = meeting.some((c) => (d.dir === 'H' ? along >= c.x && along <= c.x + c.w : along >= c.y && along <= c.y + c.h));
     if (onCrossing) break;
     const rects = new Map(layout.cells.map((c) => [c.leafId, c as Rect]));
     let next: { tree: Node; id: string } | null = null;

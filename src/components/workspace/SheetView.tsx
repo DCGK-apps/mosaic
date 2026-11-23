@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { currentTree } from '../../core/doc';
+import { junctions } from '../../core/edges';
 import { computeLayout } from '../../core/geometry';
 import { layoutText, type TextBox } from '../../core/text';
 import type { Crop } from '../../core/types';
 import { loadFonts, useTextMeasure } from '../../fonts';
 import type { Mosaic } from '../../hooks/useMosaic';
 import { Cell } from './Cell';
-import { Divider } from './Divider';
+import { Divider, JunctionKnob } from './Divider';
 import { TextFrame, TextItem } from './TextItem';
 import { useEdgeDrag } from './useEdgeDrag';
 
@@ -90,7 +91,8 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
   const onRemove = useCallback((photoId: string) => act({ type: 'toMagazine', photoId }), [act]);
 
   const sheetRef = useRef<HTMLDivElement>(null);
-  const edges = useEdgeDrag({ tree, sheet, layout, scale, sheetRef, act, endGesture });
+  const edges = useEdgeDrag({ tree, sheet, scale, sheetRef, act, endGesture });
+  const crossings = useMemo(() => junctions(layout), [layout]);
 
   const dragPhoto = drag && layout.cells.find((c) => c.leafId === drag.from);
 
@@ -128,8 +130,19 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
           />
         );
       })}
-      {!swapMode && layout.dividers.map((d) => (
-          <Divider key={d.splitId} divider={d} scale={scale} active={edges.active === d.splitId} onGrab={edges.onGrab} />
+      {!swapMode &&
+        layout.dividers.map((d) => (
+          <Divider key={d.splitId} divider={d} scale={scale} active={edges.active === d.splitId} onGrab={edges.onGrabEdge} />
+        ))}
+      {!swapMode &&
+        crossings.map((j) => (
+          <JunctionKnob
+            key={`${j.x.toFixed(2)}:${j.y.toFixed(2)}`}
+            junction={j}
+            scale={scale}
+            active={!!edges.active && (j.vertical.includes(edges.active) || j.horizontal.includes(edges.active))}
+            onGrab={edges.onGrabJunction}
+          />
         ))}
       {texts.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" data-testid="text-layer">

@@ -62,7 +62,6 @@ describe('isolateSegment', () => {
     const h = divider(cross, 'rows');
     const v = divider(cross, 'top');
     expect(isolateSegment(cross, sheet, 'rows', { x: v.x + v.w / 2, y: h.y + 3 })).toBe(cross);
-    expect(isolateSegment(cross, sheet, 'rows', { x: v.x - 1, y: h.y + 3 }, 2)).toBe(cross);
   });
 
   it('does not cut at a T-junction (the lines are not in line)', () => {
@@ -124,13 +123,12 @@ describe('isolateSegment', () => {
     expect(moved.c![2]).toBeLessThan(before.c![2]!);
   });
 
-  it('on the crossing, parts in line are joined back: the whole line moves', () => {
+  it('joinLine joins parts in line back into one edge: the whole line moves', () => {
     const h = divider(cross, 'rows');
-    const v = divider(cross, 'top');
     const cut = isolateSegment(cross, sheet, 'rows', { x: 20, y: h.y + 3 });
     expect(divider(cut, 'rows').w).toBeLessThan(200);
-    // Grab the left part right at the crossing (its end): the full line comes back.
-    const joined = isolateSegment(cut, sheet, 'rows', { x: v.x + 1, y: h.y + 3 }, 2);
+    // The left part joined with the right one, in line with it: the full line comes back.
+    const joined = joinLine(cut, sheet, 'rows');
     expectSamePicture(cross, joined);
     const line = divider(joined, 'rows');
     expect(line.x).toBeCloseTo(0);
@@ -145,5 +143,18 @@ describe('isolateSegment', () => {
     const t = split('cols', 'V', 0.5, split('l', 'H', 0.3, leaf('a'), leaf('b')), split('r', 'H', 0.6, leaf('c'), leaf('d')));
     expect(joinLine(t, sheet, 'l')).toBe(t);
     expect(joinLine(cross, sheet, 'rows')).toBe(cross);
+  });
+
+  it('joinLine makes the longest straight line: a column edge across three rows', () => {
+    const row = (p: string) => split(`${p}1`, 'V', 1 / 3, leaf(`${p}a`), split(`${p}2`, 'V', 0.5, leaf(`${p}b`), leaf(`${p}c`)));
+    const grid = split('r1', 'H', 1 / 3, row('t'), split('r2', 'H', 0.5, row('m'), row('b')));
+    const joined = joinLine(grid, sheet, 'm1');
+    expectSamePicture(grid, joined);
+    const d = divider(joined, 'm1');
+    expect(d.y).toBeCloseTo(0);
+    expect(d.h).toBeCloseTo(200);
+    const moved = rects(setFrac(joined, 'm1', 0.2));
+    const before = rects(grid);
+    for (const p of ['t', 'm', 'b']) expect(moved[`${p}a`]![2]).toBeLessThan(before[`${p}a`]![2]!);
   });
 });

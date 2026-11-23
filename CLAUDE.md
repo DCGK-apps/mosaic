@@ -32,7 +32,7 @@ src/core/          czysta logika (testy w tests/unit)
                    Sheet w mm: widthMm, heightMm, gapMm, radiusMm, frameColor
                    Crop {x,y ∈ -1..1, zoom ≥ 1} – zdjęcie zawsze „cover”
   doc.ts           docReducer + DocAction (addPhotos, toMagazine, fromMagazine, deleteFromMagazine,
-                   setMode, shuffle, autoStep, setFrac, isolate, swap, setCrop, setSheet, rotateSheet,
+                   setMode, shuffle, autoStep, setFrac, isolate, joinLine, swap, setCrop, setSheet, rotateSheet,
                    addText, updateText, deleteText);
                    akcje losowe dostają `seed` (reducer jest czysty), DEFAULT_SHEET, emptyDoc
   layouts.ts       generatory układów (auto losuje wiele drzew i ocenia dopasowanie proporcji)
@@ -42,7 +42,7 @@ src/core/          czysta logika (testy w tests/unit)
   crop.ts tree.ts  kadrowanie; operacje na drzewie (setFrac ma tylko bezpieczne granice 1–99%)
   restructure.ts   isolateSegment / joinLine: przebudowa drzewa bez zmiany prostokątów pól, tak by chwycona część
                    przeciętej krawędzi była osobnym podziałem (obroty drzewa + refit ułamków z uwzględnieniem odstępu)
-  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, dividersAt
+  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, junctions (krzyżyki „+”)
   history.ts       undo/redo; przeciąganie = `preview` (transient) + `end` → jeden krok
   export.ts        drawMosaic (canvas, na końcu drawTexts), canvasMeasure, exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
@@ -65,7 +65,7 @@ src/hooks/
 src/components/
   sidebar/         Sidebar + sekcje: Photos, Magazine, Layout, Size, Style, Export, Project
   workspace/       Workspace (drop plików, „Dodaj napis”, zaznaczony napis), SheetView, Cell (kadrowanie, zamiana),
-                   Divider (krawędź – tylko uchwyt), useEdgeDrag (całe przeciąganie krawędzi), TextItem (napis + TextFrame z uchwytami), TextToolbar (pasek edycji napisu)
+                   Divider (krawędź) + JunctionKnob (kropka w krzyżyku) – tylko uchwyty, useEdgeDrag (całe przeciąganie krawędzi), TextItem (napis + TextFrame z uchwytami), TextToolbar (pasek edycji napisu)
   NewProjectDialog.tsx  „Nowy projekt”: zapisać? → jako projekt / jako obraz
   FileNameDialog.tsx    pole „Nazwa pliku” + rozszerzenie, Enter/Escape
   AutoCollageDialog.tsx „Kolaże z folderu” (z-60): folder, od–do, kolejność, układ, format, ramka; postęp
@@ -107,11 +107,13 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 
 ### Krawędzie (przeciąganie, krzyżyki)
 
-- `Divider` tylko zgłasza chwycenie. `useEdgeDrag` (w `SheetView`) sam wybiera krawędź z geometrii (`dividersAt`). W krzyżyku czeka na pierwszy ruch (4 px), a kierunek decyduje, którą krawędź chwycono. Nasłuch jest na `window`, bo przebudowa drzewa może zmienić elementy.
-- Przy pierwszym ruchu `isolateSegment` tnie krawędź w każdym krzyżyku (miejscu, gdzie prostopadła linia przechodzi na drugą stronę w tej samej pozycji, ±0,01 mm). Chwycona część zachowuje `splitId`, druga dostaje `{id}~n`. Gdy punkt leży w krzyżyku (±4 px myszą, ±10 px palcem), `joinLine` łączy części w jednej linii w jeden podział (odwrotność cięcia) i rusza się cała linia. Akcja `isolate` i `setFrac` są `transient`, więc całe przeciągnięcie to jeden krok cofania.
+Dwa sposoby chwytania (`useEdgeDrag` w `SheetView`, nasłuch na `window`, bo przebudowa drzewa podmienia elementy):
+- **Krawędź** (`Divider`, kursor ↔/↕): rusza się tylko ten odcinek. Przy pierwszym ruchu `isolateSegment` tnie krawędź w każdym krzyżyku, gdzie prostopadła linia przechodzi na drugą stronę w tej samej pozycji (±0,01 mm). Chwycona część zachowuje `splitId`, druga dostaje `{id}~n`.
+- **Krzyżyk** (`JunctionKnob`, testid `junction`, kursor `move`, kropka): `junctions(layout)` znajduje tylko „+” (nie T). Kierunek pierwszego ruchu (4 px) wybiera linię: w bok → pionowa, w górę/dół → pozioma. `joinLine` łączy części w jednej linii w jeden podział (najwyższy prostopadły przodek, przez który linia przechodzi), więc rusza się najdłuższa spójna linia.
+- Akcje `isolate` / `joinLine` i `setFrac` są `transient` – całe przeciągnięcie to jeden krok cofania. Obraz w chwili przebudowy się nie zmienia (`refit` liczy ułamki z prostokątów pól, z odstępem).
 - Zakres: żadne pole nie spada poniżej `minCellMm` (15 mm, na małych arkuszach 6% krótszego boku), przy proporcjonalnym skalowaniu zagnieżdżonych podziałów. Zakres zawsze obejmuje pozycję startową, więc nic nie skacze.
 - Przyciąganie (8 px, Shift wyłącza): inne krawędzie w tym samym kierunku (poza tymi, które przesuwają się razem z nią), środek arkusza, połowa własnego obszaru.
-- E2E: `tests/e2e/edges.spec.ts`. Uwaga: przyciski zoomu komórki leżą nad krawędzią w prawej części pola, więc test dotykowy chwyta krawędź bliżej środka.
+- E2E: `tests/e2e/edges.spec.ts`. Przyciski zoomu komórki leżą nad krawędzią w prawej części pola, więc test dotykowy chwyta krawędź bliżej środka.
 
 ### Napisy
 
