@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beginEdgeDrag, cellEdge, dragFrac, junctions, minCellMm, minExtent, snapTo } from '../../src/core/edges';
+import { beginEdgeDrag, cellEdge, dragFrac, junctions, minCellMm, moveEdge, snapTo } from '../../src/core/edges';
 import { computeLayout } from '../../src/core/geometry';
 import { leaf, split } from './helpers';
 
@@ -11,23 +11,35 @@ describe('edges', () => {
     expect(minCellMm({ widthMm: 100, heightMm: 150 })).toBeCloseTo(6);
   });
 
-  it('minimum extent accounts for proportional scaling of nested splits', () => {
-    expect(minExtent(leaf('a'), 'V', 6, 15)).toBe(15);
-    // a gets 25% of what is left after the gap: 15 / 0.25 + 6.
-    expect(minExtent(split('s', 'V', 0.25, leaf('a'), leaf('b')), 'V', 6, 15)).toBeCloseTo(66);
-    // Across the split only the larger part counts.
-    expect(minExtent(split('s', 'H', 0.25, leaf('a'), leaf('b')), 'V', 6, 15)).toBe(15);
-  });
-
-  it('a drag stops before a cell gets too small', () => {
+  it('a drag stops before a photo next to the edge gets too small', () => {
     const tree = split('s', 'V', 0.5, leaf('a'), split('t', 'V', 0.5, leaf('b'), leaf('c')));
+    const layout = computeLayout(tree, sheet);
+    const t = layout.dividers.find((d) => d.splitId === 't')!;
     const drag = beginEdgeDrag(tree, sheet, 's')!;
     expect(drag.start).toBeCloseTo(147);
     expect(drag.min).toBeCloseTo(15);
-    // Right part: two halves of 15 mm + gap = 36 mm.
-    expect(drag.max).toBeCloseTo(294 - 36);
+    // b lies between this edge (+ gap) and the edge t, which stays where it is.
+    expect(drag.max).toBeCloseTo(t.x - 15 - 6);
     expect(dragFrac(drag, -1000, 0)).toBeCloseTo(15 / 294);
-    expect(dragFrac(drag, 1000, 0)).toBeCloseTo(258 / 294);
+  });
+
+  it('moveEdge keeps every other edge in place – only the photos next to it change', () => {
+    // Grid 3×3 as columns, each cut into rows; then move the first column edge.
+    const col = (p: string) => split(`${p}1`, 'H', 1 / 3, leaf(`${p}a`), split(`${p}2`, 'H', 0.5, leaf(`${p}b`), leaf(`${p}c`)));
+    const tree = split('c1', 'V', 1 / 3, col('l'), split('c2', 'V', 0.5, col('m'), col('r')));
+    const before = computeLayout(tree, sheet);
+    const moved = moveEdge(tree, sheet, 'c1', 0.2);
+    const after = computeLayout(moved, sheet);
+    const at = (l: typeof before, id: string) => l.dividers.find((d) => d.splitId === id)!;
+    expect(at(after, 'c1').x).toBeCloseTo(0.2 * 294);
+    expect(at(after, 'c2').x).toBeCloseTo(at(before, 'c2').x, 9);
+    for (const id of ['l1', 'l2', 'm1', 'm2', 'r1', 'r2']) expect(at(after, id).y).toBeCloseTo(at(before, id).y, 9);
+    const cell = (l: typeof before, id: string) => l.cells.find((c) => c.leafId === id)!;
+    expect(cell(after, 'rb')).toEqual(cell(before, 'rb'));
+    expect(cell(after, 'mb').w).toBeGreaterThan(cell(before, 'mb').w);
+    // Moving a split whose inside has no parallel edges is plain setFrac.
+    const simple = split('s', 'V', 0.5, leaf('a'), leaf('b'));
+    expect((moveEdge(simple, sheet, 's', 0.3) as typeof simple).frac).toBe(0.3);
   });
 
   it('a drag never jumps, even when the edge already is beyond the limit', () => {
@@ -37,7 +49,7 @@ describe('edges', () => {
     expect(dragFrac(drag, 0, 0)).toBeCloseTo(0.02);
   });
 
-  it('snaps to an edge in line with it, but not to edges that move along', () => {
+  it('snaps to a parallel edge', () => {
     const tree = split('rows', 'H', 0.5, split('top', 'V', 0.4, leaf('a'), leaf('b')), split('bottom', 'V', 0.6, leaf('c'), leaf('d')));
     const top = computeLayout(tree, sheet).dividers.find((d) => d.splitId === 'top')!;
     const bottom = computeLayout(tree, sheet).dividers.find((d) => d.splitId === 'bottom')!;
@@ -45,17 +57,14 @@ describe('edges', () => {
     expect(drag.targets).toContain(bottom.x);
     expect(dragFrac(drag, bottom.x - top.x - 2, 3)).toBeCloseTo(0.6);
     expect(dragFrac(drag, bottom.x - top.x - 2, 0)).not.toBeCloseTo(0.6);
-    // The horizontal edge does not snap to anything inside its own rows.
+    // The horizontal edge has nothing to snap to.
     const rows = beginEdgeDrag(tree, sheet, 'rows')!;
-    expect(rows.targets.length).toBeGreaterThan(0);
+    expect(rows.targets).toEqual([]); // no other horizontal edge
   });
 
-  it('snaps to the middle of the sheet', () => {
-    const tree = split('s', 'V', 0.3, leaf('a'), leaf('b'));
-    const drag = beginEdgeDrag(tree, sheet, 's')!;
-    expect(drag.targets).toContain(147);
-    expect(snapTo(150, drag.targets, 4)).toBe(147);
-    expect(snapTo(150, drag.targets, 2)).toBe(150);
+  it('snapTo: the nearest target within reach', () => {
+    expect(snapTo(150, [147, 160], 4)).toBe(147);
+    expect(snapTo(150, [147, 160], 2)).toBe(150);
   });
 
   it('finds crossings (+), not T-junctions', () => {

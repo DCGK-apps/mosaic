@@ -179,3 +179,16 @@ test('touch, "Układ" tool: a finger anywhere on a photo moves the edge', async 
   await touchDrag(page, { x: cc.x + cc.width / 2, y: cc.y + cc.height / 2 }, { x: cc.x + cc.width / 2 + 30, y: cc.y + cc.height / 2 });
   await expect.poll(async () => (await getDoc(page)).photos[2].crop.x).not.toBe(crop0);
 });
+
+test('moving a line leaves the other lines where they are (3×3 grid, knob)', async ({ page }) => {
+  await addPhotos(page, ['tall', 'landscape', 'portrait', 'square', 'wide']);
+  await inPanel(page, () => page.getByTestId('mode-grid').click());
+  const xs = () => dividers(page, 'V').evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().x)))].toSorted((a, b) => a - b));
+  const [first, second] = await xs();
+  const k = await box(page.getByTestId('junction').first());
+  const c = { x: k.x + k.width / 2, y: k.y + k.height / 2 };
+  await mouseDrag(page, c, { x: c.x + 30, y: c.y + 1 });
+  const after = await xs();
+  expect(after[0]).toBeGreaterThan(first! + 20);
+  expect(after[1]).toBe(second);
+});

@@ -32,7 +32,7 @@ src/core/          czysta logika (testy w tests/unit)
                    Sheet w mm: widthMm, heightMm, gapMm, radiusMm, frameColor
                    Crop {x,y ∈ -1..1, zoom ≥ 1} – zdjęcie zawsze „cover”
   doc.ts           docReducer + DocAction (addPhotos, toMagazine, fromMagazine, deleteFromMagazine,
-                   setMode, shuffle, autoStep, setFrac, isolate, joinLine, swap, setCrop, setSheet, rotateSheet,
+                   setMode, shuffle, autoStep, setFrac, moveEdge, isolate, joinLine, swap, setCrop, setSheet, rotateSheet,
                    addText, updateText, deleteText);
                    akcje losowe dostają `seed` (reducer jest czysty), DEFAULT_SHEET, emptyDoc
   layouts.ts       generatory układów (auto losuje wiele drzew i ocenia dopasowanie proporcji)
@@ -42,7 +42,7 @@ src/core/          czysta logika (testy w tests/unit)
   crop.ts tree.ts  kadrowanie; operacje na drzewie (setFrac ma tylko bezpieczne granice 1–99%)
   restructure.ts   isolateSegment / joinLine: przebudowa drzewa bez zmiany prostokątów pól, tak by chwycona część
                    przeciętej krawędzi była osobnym podziałem (obroty drzewa + refit ułamków z uwzględnieniem odstępu)
-  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, junctions (krzyżyki „+”), cellEdge (krawędź zdjęcia dla trybu Układ)
+  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, moveEdge (inne krawędzie stoją), junctions (krzyżyki „+”), cellEdge (krawędź zdjęcia dla trybu Układ)
   history.ts       undo/redo; przeciąganie = `preview` (transient) + `end` → jeden krok
   export.ts        drawMosaic (canvas, na końcu drawTexts), canvasMeasure, exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
@@ -116,8 +116,9 @@ Sposoby chwytania (`useEdgeDrag` w `SheetView`, nasłuch na `window`, bo przebud
 - **Zdjęcie w trybie Układ** (`onGrabCell`): kierunek pierwszego ruchu wybiera oś, potem jak przy krawędzi (tylko odcinek przy tym zdjęciu).
 - **Krzyżyk** (`JunctionKnob`, testid `junction`, kursor `move`, kropka): `junctions(layout)` znajduje tylko „+” (nie T). Kierunek pierwszego ruchu (4 px) wybiera linię: w bok → pionowa, w górę/dół → pozioma. `joinLine` łączy części w jednej linii w jeden podział (najwyższy prostopadły przodek, przez który linia przechodzi), więc rusza się najdłuższa spójna linia.
 - Akcje `isolate` / `joinLine` i `setFrac` są `transient` – całe przeciągnięcie to jeden krok cofania. Obraz w chwili przebudowy się nie zmienia (`refit` liczy ułamki z prostokątów pól, z odstępem).
-- Zakres: żadne pole nie spada poniżej `minCellMm` (15 mm, na małych arkuszach 6% krótszego boku), przy proporcjonalnym skalowaniu zagnieżdżonych podziałów. Zakres zawsze obejmuje pozycję startową, więc nic nie skacze.
-- Przyciąganie (8 px, Shift wyłącza): inne krawędzie w tym samym kierunku (poza tymi, które przesuwają się razem z nią), środek arkusza, połowa własnego obszaru.
+- Przeciąganie używa akcji `moveEdge` (nie `setFrac`): wszystkie inne krawędzie zostają w miejscu, zmieniają się tylko zdjęcia przy krawędzi (zagnieżdżone podziały w tym samym kierunku dostają przeliczone ułamki). `setFrac` skalowałby wszystko proporcjonalnie, a inne linie „jechałyby” razem z nią.
+- Zakres: żadne zdjęcie przy krawędzi nie spada poniżej `minCellMm` (15 mm, na małych arkuszach 6% krótszego boku). Zakres zawsze obejmuje pozycję startową, więc nic nie skacze.
+- Przyciąganie (6 px, Shift wyłącza): tylko do innych krawędzi w tym samym kierunku – żeby łatwo zrobić krzyżyk. Przyciąganie do środków dawało wrażenie oporu.
 - E2E: `tests/e2e/edges.spec.ts`. Przyciski zoomu komórki leżą nad krawędzią w prawej części pola, więc test dotykowy chwyta krawędź bliżej środka.
 
 ### Napisy

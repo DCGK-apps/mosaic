@@ -8,7 +8,8 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 - **Układy:** Auto (losuje tysiące podziałów i wybiera najlepiej pasujący do proporcji zdjęć, z historią losowań), Siatka, Centralny, Poziomo, Pionowo.
 - **Przełącznik na płótnie: Kadr / Układ / Zamiana** – co robi przeciągnięcie zdjęcia. W trybie **Układ** nie trzeba trafiać w krawędź: przeciągnięcie w dowolnym miejscu zdjęcia przesuwa jego krawędź bliższą palcowi (ruch w bok – lewą lub prawą, w górę/dół – górną lub dolną). Wygodne zwłaszcza na telefonie.
 - **Krawędzie** między zdjęciami można przeciągać (myszą i palcem):
-  - krawędź przyciąga się do innych krawędzi w jednej linii i do środka arkusza (Shift – bez przyciągania), więc łatwo zrobić „krzyżyk”,
+  - przesuwana krawędź zmienia tylko zdjęcia tuż przy niej, pozostałe krawędzie stoją w miejscu,
+  - krawędź przyciąga się do innych krawędzi w jednej linii (Shift – bez przyciągania), więc łatwo zrobić „krzyżyk”,
   - chwycenie krawędzi (kursor ↔ / ↕) przesuwa tylko ten jeden odcinek – także połowę linii przeciętej przez inną. Układ przebudowuje się w locie, nic nie przeskakuje,
   - w krzyżyku jest kropka (kursor ✥): przeciągnięcie jej przesuwa całą najdłuższą spójną linię – w bok pionową, w górę lub w dół poziomą,
   - pole nie robi się węższe niż 15 mm (na małych arkuszach mniej).

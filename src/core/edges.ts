@@ -12,19 +12,6 @@ export function minCellMm(sheet: Pick<Sheet, 'widthMm' | 'heightMm'>): number {
   return Math.min(15, Math.min(sheet.widthMm, sheet.heightMm) * 0.06);
 }
 
-/**
- * Smallest size of `node` along `dir` at which every cell inside still has
- * `min` mm – the parts of a split scale proportionally when it shrinks.
- */
-export function minExtent(node: Node, dir: Dir, gapMm: number, min: number): number {
-  if (node.kind === 'leaf') return min;
-  const a = minExtent(node.a, dir, gapMm, min);
-  const b = minExtent(node.b, dir, gapMm, min);
-  if (node.dir !== dir) return Math.max(a, b);
-  const f = Math.min(1 - 1e-6, Math.max(1e-6, node.frac));
-  return gapMm + Math.max(a / f, b / (1 - f));
-}
-
 function findSplit(n: Node, id: string): Node | null {
   if (n.id === id) return n;
   return n.kind === 'split' ? (findSplit(n.a, id) ?? findSplit(n.b, id)) : null;
@@ -50,7 +37,7 @@ export interface EdgeDrag {
   /** Allowed positions (always include `start`, so nothing jumps). */
   min: number;
   max: number;
-  /** Positions the edge snaps to: other edges in line with it, the middle of the sheet and of its own area. */
+  /** Positions the edge snaps to: other edges parallel to it. */
   targets: number[];
 }
 
@@ -63,21 +50,26 @@ export function beginEdgeDrag(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'height
   if (!d || !node || node.kind !== 'split' || d.available <= 0) return null;
   const start = pos(d);
   const origin = start - d.frac * d.available;
-  const gap = Math.max(0, sheet.gapMm);
   const min = minCellMm(sheet);
-  let lo = origin + minExtent(node.a, d.dir, gap, min);
-  let hi = origin + d.available - minExtent(node.b, d.dir, gap, min);
+  const vertical = d.dir === 'V';
+  const band = vertical ? d.w : d.h;
+  const eps = 0.01;
+  // Only the photos right next to the edge change (moveEdge keeps every other edge),
+  // so they set the limits: none of them may get smaller than `min`.
+  const beside = (c: { x: number; y: number; w: number; h: number }) => (vertical ? c.y < d.y + d.h - eps && c.y + c.h > d.y + eps : c.x < d.x + d.w - eps && c.x + c.w > d.x + eps);
+  let lo = -Infinity;
+  let hi = Infinity;
+  for (const c of layout.cells) {
+    if (!beside(c)) continue;
+    const c0 = vertical ? c.x : c.y;
+    const c1 = vertical ? c.x + c.w : c.y + c.h;
+    if (Math.abs(c1 - start) < eps) lo = Math.max(lo, c0 + min);
+    if (Math.abs(c0 - (start + band)) < eps) hi = Math.min(hi, c1 - min - band);
+  }
   lo = Math.min(lo, start);
   hi = Math.max(hi, start);
-  // Edges inside the dragged area move along with it – they are no targets.
-  const inside = splitIds(node);
-  const band = d.dir === 'V' ? d.w : d.h;
-  const sheetLength = d.dir === 'V' ? sheet.widthMm : sheet.heightMm;
-  const targets = [
-    ...layout.dividers.filter((x) => x.dir === d.dir && !inside.has(x.splitId)).map(pos),
-    sheetLength / 2 - band / 2,
-    origin + d.available / 2,
-  ].filter((t) => t >= lo && t <= hi);
+  // Snapping is there to make crossings – only to parallel edges, so the drag feels free elsewhere.
+  const targets = layout.dividers.filter((x) => x.dir === d.dir && x.splitId !== splitId).map(pos).filter((t) => t >= lo && t <= hi);
   return { splitId, dir: d.dir, start, origin, available: d.available, min: lo, max: hi, targets };
 }
 
@@ -161,4 +153,38 @@ export function cellEdge(layout: Layout, cell: { x: number; y: number; w: number
   if (!before || !after) return before ?? after;
   const p = dir === 'V' ? at.x - cell.x : at.y - cell.y;
   return p < (dir === 'V' ? cell.w : cell.h) / 2 ? before : after;
+}
+
+/**
+ * Moves the edge of split `splitId` to `frac` while every other edge stays
+ * where it is: only the photos right next to it change size. (Setting the
+ * fraction alone would scale everything on both sides proportionally, so
+ * other edges would drift along.)
+ */
+export function moveEdge(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, frac: number): Node {
+  const node = findSplit(tree, splitId);
+  if (!node || node.kind !== 'split') return tree;
+  // Edges inside the moved split, parallel to it, keep their place on the sheet.
+  const keep = new Map(
+    computeLayout(tree, sheet)
+      .dividers.filter((d) => d.dir === node.dir && d.splitId !== splitId && splitIds(node).has(d.splitId))
+      .map((d) => [d.splitId, pos(d)]),
+  );
+  const gap = Math.max(0, sheet.gapMm);
+  const f = Math.min(0.999, Math.max(0.001, frac));
+  const walk = (n: Node, x: number, y: number, w: number, h: number): Node => {
+    if (n.kind === 'leaf') return n;
+    const vertical = n.dir === 'V';
+    const length = vertical ? w : h;
+    const available = length - Math.min(gap, length);
+    const at = keep.get(n.id);
+    let nf = n.id === splitId ? f : at !== undefined && available > 0 ? (at - (vertical ? x : y)) / available : n.frac;
+    nf = Math.min(0.999, Math.max(0.001, nf));
+    const first = available * nf;
+    const g = length - available;
+    const a = vertical ? walk(n.a, x, y, first, h) : walk(n.a, x, y, w, first);
+    const b = vertical ? walk(n.b, x + first + g, y, w - first - g, h) : walk(n.b, x, y + first + g, w, h - first - g);
+    return a === n.a && b === n.b && nf === n.frac ? n : { ...n, frac: nf, a, b };
+  };
+  return walk(tree, 0, 0, Math.max(0, sheet.widthMm), Math.max(0, sheet.heightMm));
 }

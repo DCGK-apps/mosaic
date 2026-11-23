@@ -8,7 +8,7 @@ import type { Mosaic } from '../../hooks/useMosaic';
 /** Grab area of an edge in screen pixels (also when the frame is thin or 0). */
 export const HIT_PX = 16;
 /** An edge snaps to another one in line with it from this distance (Shift: no snapping). */
-const SNAP_PX = 8;
+const SNAP_PX = 6;
 /** At a crossing the first movement tells which edge is meant. */
 const DIRECTION_SLOP_PX = 4;
 /** Movement below this is still a click. */
@@ -85,7 +85,7 @@ export function useEdgeDrag(params: Params): {
         if (!drag) return;
       }
       const frac = dragFrac(drag, (drag.dir === 'V' ? dx : dy) / s, ev.shiftKey ? 0 : SNAP_PX / s);
-      act({ type: 'setFrac', splitId: drag.splitId, frac }, { transient: true });
+      act({ type: 'moveEdge', splitId: drag.splitId, frac }, { transient: true });
     };
     const finish = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
