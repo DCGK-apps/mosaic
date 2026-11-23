@@ -1,12 +1,10 @@
 import {
   AlignHorizontalJustifyStart,
   AlignVerticalJustifyStart,
-  ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
   Grid,
   LayoutGrid,
-  Move,
   RefreshCw,
   Target,
   type LucideIcon,
@@ -27,14 +25,12 @@ interface Props {
   mode: LayoutMode;
   autoIndex: number;
   autoCount: number;
-  swapMode: boolean;
   onMode: (mode: LayoutMode) => void;
   onAutoStep: (delta: number) => void;
   onShuffle: () => void;
-  onSwapMode: (swap: boolean) => void;
 }
 
-export function LayoutSection({ mode, autoIndex, autoCount, swapMode, onMode, onAutoStep, onShuffle, onSwapMode }: Props) {
+export function LayoutSection({ mode, autoIndex, autoCount, onMode, onAutoStep, onShuffle }: Props) {
   return (
     <div className="space-y-5">
       <div>
@@ -96,31 +92,6 @@ export function LayoutSection({ mode, autoIndex, autoCount, swapMode, onMode, on
             </button>
           </div>
         )}
-      </div>
-
-      <div>
-        <SectionTitle>Akcja myszy / dotyku</SectionTitle>
-        <div className="flex rounded-lg bg-slate-200 p-1" role="radiogroup" aria-label="Akcja myszy / dotyku">
-          {[
-            { swap: false, label: 'Przesuń kadr', Icon: Move, id: 'tool-crop' },
-            { swap: true, label: 'Zamień miejscami', Icon: ArrowLeftRight, id: 'tool-swap' },
-          ].map(({ swap, label, Icon, id }) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={swapMode === swap}
-              data-testid={id}
-              onClick={() => onSwapMode(swap)}
-              className={cx(
-                'flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-all',
-                swapMode === swap ? 'bg-white text-brand shadow' : 'text-slate-500 hover:text-slate-700',
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" /> {label}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );

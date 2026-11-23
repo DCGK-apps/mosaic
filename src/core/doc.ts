@@ -2,6 +2,8 @@ import { clampSide } from './formats';
 import { autoLayout, fixedLayout } from './layouts';
 import { createRng } from './random';
 import { cleanText, type TextBox } from './text';
+import { moveEdge } from './edges';
+import { isolateSegment, joinLine } from './restructure';
 import { leaves, removePhoto, setFrac, swapLeaves } from './tree';
 import type { Crop, Doc, LayoutMode, Node, Photo, Sheet } from './types';
 
@@ -28,6 +30,12 @@ export type DocAction =
   | { type: 'shuffle'; seed: number }
   | { type: 'autoStep'; delta: number }
   | { type: 'setFrac'; splitId: string; frac: number }
+  /** Drag of an edge: like setFrac, but every other edge stays in place (see edges.ts). */
+  | { type: 'moveEdge'; splitId: string; frac: number }
+  /** Same picture, but the part of the edge under (x, y) mm becomes a divider of its own (see restructure.ts). */
+  | { type: 'isolate'; splitId: string; x: number; y: number }
+  /** Same picture, but the edge and the parts in line with it become one divider – the whole line. */
+  | { type: 'joinLine'; splitId: string }
   | { type: 'swap'; leafA: string; leafB: string }
   | { type: 'setCrop'; photoId: string; crop: Crop }
   | { type: 'setSheet'; patch: Partial<Sheet> }
@@ -115,6 +123,27 @@ export function docReducer(doc: Doc, action: DocAction): Doc {
       const tree = currentTree(doc);
       if (!tree) return doc;
       const next = setFrac(tree, action.splitId, action.frac);
+      return next === tree ? doc : withTree(doc, next);
+    }
+
+    case 'moveEdge': {
+      const tree = currentTree(doc);
+      if (!tree) return doc;
+      const next = moveEdge(tree, doc.sheet, action.splitId, action.frac);
+      return next === tree ? doc : withTree(doc, next);
+    }
+
+    case 'isolate': {
+      const tree = currentTree(doc);
+      if (!tree) return doc;
+      const next = isolateSegment(tree, doc.sheet, action.splitId, { x: action.x, y: action.y });
+      return next === tree ? doc : withTree(doc, next);
+    }
+
+    case 'joinLine': {
+      const tree = currentTree(doc);
+      if (!tree) return doc;
+      const next = joinLine(tree, doc.sheet, action.splitId);
       return next === tree ? doc : withTree(doc, next);
     }
 

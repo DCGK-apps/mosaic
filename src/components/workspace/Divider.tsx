@@ -1,20 +1,27 @@
-import { useRef } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { Junction } from '../../core/edges';
 import type { DividerBox } from '../../core/geometry';
 import { cx } from '../cx';
+import { HIT_PX } from './useEdgeDrag';
 
-/** Minimum grab area in screen pixels, also when the frame is thin or 0. */
-const HIT_PX = 16;
+/** Grab area of a crossing knob in screen pixels. */
+const KNOB_PX = 24;
+/** …larger with the "Układ" tool, made for a finger. */
+const KNOB_LARGE_PX = 40;
 
 interface Props {
   divider: DividerBox;
   /** Screen pixels per millimetre. */
   scale: number;
-  onMove: (splitId: string, frac: number) => void;
-  onEnd: () => void;
+  /** Being dragged – the handle stays visible. */
+  active: boolean;
+  /** "Układ" tool: handles always visible. */
+  shown?: boolean;
+  /** The drag itself is handled by useEdgeDrag. */
+  onGrab: (splitId: string, e: ReactPointerEvent) => void;
 }
 
-export function Divider({ divider: d, scale, onMove, onEnd }: Props) {
-  const drag = useRef<{ start: number; frac: number } | null>(null);
+export function Divider({ divider: d, scale, active, shown, onGrab }: Props) {
   const vertical = d.dir === 'V';
   const thick = Math.max(HIT_PX, (vertical ? d.w : d.h) * scale);
   const style = vertical
@@ -29,31 +36,48 @@ export function Divider({ divider: d, scale, onMove, onEnd }: Props) {
       data-testid="divider"
       data-split-id={d.splitId}
       data-dir={d.dir}
+      data-active={active || undefined}
       style={style}
       className={cx('group absolute z-10 flex touch-none items-center justify-center', vertical ? 'cursor-col-resize' : 'cursor-row-resize')}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { start: vertical ? e.clientX : e.clientY, frac: d.frac };
-      }}
-      onPointerMove={(e) => {
-        const g = drag.current;
-        if (!g || d.available <= 0) return;
-        const deltaMm = ((vertical ? e.clientX : e.clientY) - g.start) / scale;
-        onMove(d.splitId, g.frac + deltaMm / d.available);
-      }}
-      onPointerUp={() => {
-        drag.current = null;
-        onEnd();
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-        onEnd();
-      }}
+      onPointerDown={(e) => onGrab(d.splitId, e)}
     >
-      <div className={cx('rounded-full bg-blue-900 opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100', vertical ? 'h-12 w-1.5' : 'h-1.5 w-12')} />
+      <div
+        className={cx(
+          'rounded-full bg-blue-900 transition-opacity group-hover:opacity-100',
+          active ? 'opacity-100' : shown ? 'opacity-60' : 'opacity-0',
+          vertical ? 'h-12 w-1.5' : 'h-1.5 w-12',
+        )}
+      />
+    </div>
+  );
+}
+
+interface JunctionProps {
+  junction: Junction;
+  scale: number;
+  active: boolean;
+  large?: boolean;
+  onGrab: (j: Junction, e: ReactPointerEvent) => void;
+}
+
+/** Knob on a crossing: grabbed here, the whole line moves (the direction of the drag picks which one). */
+export function JunctionKnob({ junction: j, scale, active, large, onGrab }: JunctionProps) {
+  const size = Math.max(large ? KNOB_LARGE_PX : KNOB_PX, Math.max(j.w, j.h) * scale + 6);
+  return (
+    <div
+      data-testid="junction"
+      title="Przesuń całą linię"
+      style={{ left: (j.x + j.w / 2) * scale - size / 2, top: (j.y + j.h / 2) * scale - size / 2, width: size, height: size }}
+      className="group absolute z-[15] flex cursor-move touch-none items-center justify-center"
+      onPointerDown={(e) => onGrab(j, e)}
+    >
+      <div
+        className={cx(
+          large ? 'h-5 w-5' : 'h-3 w-3',
+          'rounded-full border-2 border-blue-900 bg-white shadow transition-opacity group-hover:opacity-100',
+          active ? 'opacity-100' : 'opacity-70',
+        )}
+      />
     </div>
   );
 }

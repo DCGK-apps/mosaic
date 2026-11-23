@@ -19,11 +19,11 @@ test('dragging a divider resizes the neighbouring photos; undo restores it in on
   await expect(undoButton(page)).toBeEnabled(); // the layout change before is still there
 });
 
-test('a divider stops at 10% / 90%', async ({ page }) => {
+test('a divider stops before a photo gets narrower than 15 mm', async ({ page }) => {
   const d = center(await box(dividers(page, 'V').first()));
   await mouseDrag(page, d, { x: 0, y: d.y });
-  const split = (await getDoc(page)).tree;
-  expect(split.frac).toBeCloseTo(0.1);
+  const { tree, sheet } = await getDoc(page);
+  expect(tree.frac * (sheet.widthMm - sheet.gapMm)).toBeCloseTo(15, 1);
 });
 
 test('dragging a photo moves the crop, never leaving an empty gap', async ({ page }) => {
@@ -55,7 +55,7 @@ test('zoom buttons and the mouse wheel magnify the photo (100–300%)', async ({
 
 test('swap mode: dragging a photo onto another swaps them', async ({ page }) => {
   const before = await shownPhotos(page);
-  await inPanel(page, () => page.getByTestId('tool-swap').click());
+  await page.getByTestId('tool-swap').click();
   await expect(dividers(page)).toHaveCount(0);
   const a = center(await box(cells(page).nth(0)));
   const c = center(await box(cells(page).nth(2)));

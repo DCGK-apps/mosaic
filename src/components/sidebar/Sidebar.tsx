@@ -16,8 +16,6 @@ export type PanelTab = 'photos' | 'options';
 
 export interface SidebarProps {
   mosaic: Mosaic;
-  swapMode: boolean;
-  onSwapMode: (swap: boolean) => void;
   onAddPhotos: () => void;
   dpi: number;
   exportType: ExportType;
@@ -30,6 +28,8 @@ export interface SidebarProps {
   onNewProject: () => void;
   /** Computer only: "Kolaże z folderu" – an automatic series of collages. */
   onAutoCollage?: () => void;
+  /** Preview builds only: adds generated sample photos. */
+  onDemoPhotos?: () => void;
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   /** Mobile only: closes the drawer. */
@@ -58,7 +58,7 @@ export function UndoRedo({ mosaic, dark }: { mosaic: Mosaic; dark?: boolean }) {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { mosaic, swapMode, onSwapMode, onAddPhotos, onClose, tab, onTab } = props;
+  const { mosaic, onAddPhotos, onClose, tab, onTab } = props;
   const { doc, act, endGesture, urlOf } = mosaic;
   const hasPhotos = doc.photos.length > 0;
 
@@ -118,6 +118,16 @@ export function Sidebar(props: SidebarProps) {
       <div className={cx('p-6 md:pb-0', tab !== 'photos' && 'max-md:hidden')} role="tabpanel" data-testid="panel-photos">
         <div>
           <PhotosSection photos={doc.photos} urlOf={urlOf} onAdd={onAddPhotos} onRemove={(photoId) => act({ type: 'toMagazine', photoId })} />
+          {props.onDemoPhotos && (
+            <button
+              type="button"
+              onClick={props.onDemoPhotos}
+              data-testid="demo-photos"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-brand py-2.5 text-sm font-bold text-brand transition-colors hover:bg-blue-50"
+            >
+              Przykładowe zdjęcia (wersja testowa)
+            </button>
+          )}
           {props.onAutoCollage && (
             <button
               type="button"
@@ -149,11 +159,9 @@ export function Sidebar(props: SidebarProps) {
               mode={doc.mode}
               autoIndex={doc.autoIndex}
               autoCount={doc.autoHistory.length}
-              swapMode={swapMode}
               onMode={(mode) => act({ type: 'setMode', mode })}
               onAutoStep={(delta) => act({ type: 'autoStep', delta })}
               onShuffle={() => act({ type: 'shuffle' })}
-              onSwapMode={onSwapMode}
             />
             <Separator />
           </>

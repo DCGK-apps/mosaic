@@ -1,20 +1,23 @@
-import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { currentTree } from '../../core/doc';
+import { junctions } from '../../core/edges';
 import { computeLayout } from '../../core/geometry';
 import { layoutText, type TextBox } from '../../core/text';
 import type { Crop } from '../../core/types';
 import { loadFonts, useTextMeasure } from '../../fonts';
 import type { Mosaic } from '../../hooks/useMosaic';
 import { Cell } from './Cell';
-import { Divider } from './Divider';
+import { Divider, JunctionKnob } from './Divider';
 import { TextFrame, TextItem } from './TextItem';
+import type { Tool } from './ToolSwitch';
+import { useEdgeDrag } from './useEdgeDrag';
 
 interface Props {
   mosaic: Mosaic;
   /** Available space in screen pixels. */
   width: number;
   height: number;
-  swapMode: boolean;
+  tool: Tool;
   selectedText: string | null;
   onSelectText: (id: string | null) => void;
   /** Double click on a caption – edit its text. */
@@ -34,7 +37,7 @@ const shown = (t: TextBox): TextBox => (t.text.trim() ? t : { ...t, text: 'Napis
 const leafAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-leaf-id]')?.dataset.leafId ?? null;
 
 /** The sheet as on paper: every position comes from computeLayout(), the same as in the exported file. */
-export function SheetView({ mosaic, width, height, swapMode, selectedText, onSelectText, onEditText }: Props) {
+export function SheetView({ mosaic, width, height, tool, selectedText, onSelectText, onEditText }: Props) {
   const { doc, act, endGesture, urlOf } = mosaic;
   const { sheet } = doc;
   const scale = Math.max(0, Math.min(width / sheet.widthMm, height / sheet.heightMm));
@@ -86,13 +89,19 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
   }, [dragging, act]);
 
   const onCrop = useCallback((photoId: string, crop: Crop, transient: boolean) => act({ type: 'setCrop', photoId, crop }, { transient }), [act]);
-  const onFrac = useCallback((splitId: string, frac: number) => act({ type: 'setFrac', splitId, frac }, { transient: true }), [act]);
   const onRemove = useCallback((photoId: string) => act({ type: 'toMagazine', photoId }), [act]);
+
+  const swapMode = tool === 'swap';
+  const edgesMode = tool === 'edges';
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const edges = useEdgeDrag({ tree, sheet, layout, scale, sheetRef, act, endGesture });
+  const crossings = useMemo(() => junctions(layout), [layout]);
 
   const dragPhoto = drag && layout.cells.find((c) => c.leafId === drag.from);
 
   return (
     <div
+      ref={sheetRef}
       data-testid="sheet"
       className="relative shadow-2xl"
       style={{ width: sheet.widthMm * scale, height: sheet.heightMm * scale, backgroundColor: sheet.frameColor }}
@@ -112,7 +121,7 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
             url={urlOf(photo.id)}
             scale={scale}
             radiusMm={sheet.radiusMm}
-            swapMode={swapMode}
+            tool={tool}
             active={active === cell.leafId}
             dragging={drag?.from === cell.leafId}
             dropTarget={!!drag && drag.over === cell.leafId && drag.over !== drag.from}
@@ -121,10 +130,26 @@ export function SheetView({ mosaic, width, height, swapMode, selectedText, onSel
             onEnd={endGesture}
             onRemove={onRemove}
             onSwapStart={onSwapStart}
+            onEdgeStart={edges.onGrabCell}
           />
         );
       })}
-      {!swapMode && layout.dividers.map((d) => <Divider key={d.splitId} divider={d} scale={scale} onMove={onFrac} onEnd={endGesture} />)}
+      {!swapMode &&
+        layout.dividers.map((d) => (
+          <Divider key={d.splitId} divider={d} scale={scale} active={edges.active === d.splitId} shown={edgesMode} onGrab={edges.onGrabEdge} />
+        ))}
+      {!swapMode &&
+        crossings.map((j, i) => (
+          <JunctionKnob
+            // By index: a knob that moves with its line keeps its element.
+            key={i}
+            junction={j}
+            scale={scale}
+            large={edgesMode}
+            active={!!edges.active && (j.vertical.includes(edges.active) || j.horizontal.includes(edges.active))}
+            onGrab={edges.onGrabJunction}
+          />
+        ))}
       {texts.length > 0 && (
         <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" data-testid="text-layer">
           {texts.map((t) => (

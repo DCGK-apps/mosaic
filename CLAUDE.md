@@ -32,14 +32,17 @@ src/core/          czysta logika (testy w tests/unit)
                    Sheet w mm: widthMm, heightMm, gapMm, radiusMm, frameColor
                    Crop {x,y ∈ -1..1, zoom ≥ 1} – zdjęcie zawsze „cover”
   doc.ts           docReducer + DocAction (addPhotos, toMagazine, fromMagazine, deleteFromMagazine,
-                   setMode, shuffle, autoStep, setFrac, swap, setCrop, setSheet, rotateSheet,
+                   setMode, shuffle, autoStep, setFrac, moveEdge, isolate, joinLine, swap, setCrop, setSheet, rotateSheet,
                    addText, updateText, deleteText);
                    akcje losowe dostają `seed` (reducer jest czysty), DEFAULT_SHEET, emptyDoc
   layouts.ts       generatory układów (auto losuje wiele drzew i ocenia dopasowanie proporcji)
   geometry.ts      prostokąty pól/krawędzi w mm – WSPÓLNE dla podglądu i eksportu
   text.ts          napisy: FONTS, newTextBox, cleanText, layoutText (linie w mm – WSPÓLNE dla podglądu
                    i eksportu; pomiar przez Measure = canvas measureText), fontCss, moveText, snapAngle
-  crop.ts tree.ts  kadrowanie; operacje na drzewie
+  crop.ts tree.ts  kadrowanie; operacje na drzewie (setFrac ma tylko bezpieczne granice 1–99%)
+  restructure.ts   isolateSegment / joinLine: przebudowa drzewa bez zmiany prostokątów pól, tak by chwycona część
+                   przeciętej krawędzi była osobnym podziałem (obroty drzewa + refit ułamków z uwzględnieniem odstępu)
+  edges.ts         przeciąganie krawędzi: beginEdgeDrag (zakres z minCellMm, cele przyciągania), dragFrac, moveEdge (inne krawędzie stoją), junctions (krzyżyki „+”), cellEdge (krawędź zdjęcia dla trybu Układ)
   history.ts       undo/redo; przeciąganie = `preview` (transient) + `end` → jeden krok
   export.ts        drawMosaic (canvas, na końcu drawTexts), canvasMeasure, exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
@@ -62,7 +65,7 @@ src/hooks/
 src/components/
   sidebar/         Sidebar + sekcje: Photos, Magazine, Layout, Size, Style, Export, Project
   workspace/       Workspace (drop plików, „Dodaj napis”, zaznaczony napis), SheetView, Cell (kadrowanie, zamiana),
-                   Divider (krawędź), TextItem (napis + TextFrame z uchwytami), TextToolbar (pasek edycji napisu)
+                   Divider (krawędź) + JunctionKnob (kropka w krzyżyku) – tylko uchwyty, useEdgeDrag (całe przeciąganie krawędzi), TextItem (napis + TextFrame z uchwytami), TextToolbar (pasek edycji napisu)
   NewProjectDialog.tsx  „Nowy projekt”: zapisać? → jako projekt / jako obraz
   FileNameDialog.tsx    pole „Nazwa pliku” + rozszerzenie, Enter/Escape
   AutoCollageDialog.tsx „Kolaże z folderu” (z-60): folder, od–do, kolejność, układ, format, ramka; postęp
@@ -77,6 +80,8 @@ src/download.ts    pobranie bloba przez <a download>
 src/prefs.ts       localStorage „mosaic.prefs” (loadPref/savePref)
 src/pwa.ts sw-template.js  instalacja, baner „Dostępna nowa wersja”; sw.js generuje vite.config.ts
 src/toast.ts       krótki komunikat na górze ekranu
+src/demoPhotos.ts  przykładowe zdjęcia (canvas) – przycisk `demo-photos` tylko w buildzie z VITE_DEMO_PHOTOS=1
+                   (wersja testowa w podglądzie Claude, gdzie na telefonie nie działa wybór plików)
 src/fonts.ts       czcionki napisów: registerFonts (FontFace z public/fonts, podzbiory latin/latin-ext),
                    loadFonts (przed eksportem), useTextMeasure (nowy pomiar po wczytaniu czcionki)
 ```
@@ -101,6 +106,20 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 - `planBatch`: programowanie dynamiczne po kolejnych zdjęciach; koszt kolażu = `layoutCost` (te same kryteria co Auto) × liczba zdjęć + lekka kara za nierówne rozmiary + duża kara za wyjście poza zakres (tylko gdy zakresu nie da się spełnić). Dla 500 zdjęć i zakresu 2–20 trwa ~4 s, dlatego jest async z `tick` (postęp, przerwanie).
 - `saveSeries` nie przerywa się na jednym kolażu: brak pamięci (`RenderError('memory')`) ponawia raz po 0,5 s, nieczytelne zdjęcie (`RenderError('photo')`) i błąd zapisu nie. Zwraca `{ saved, failed }`, a `SeriesSaveDialog` pokazuje raport z przyczynami i „Spróbuj ponownie” tylko dla nieudanych. Numer pliku = numer kolażu w panelu; puste kolaże są pomijane, a okno o tym informuje.
 - E2E: `tests/e2e/series.spec.ts` – folder wybiera `setInputFiles(ASSETS)`, `showDirectoryPicker` jest podmieniany w `addInitScript`; `__mosaic.batch()` zwraca serię.
+
+### Krawędzie (przeciąganie, krzyżyki)
+
+Przełącznik narzędzi `ToolSwitch` (lewy górny róg płótna, także na telefonie; testid `tool-crop` / `tool-edges` / `tool-swap`, stan `tool` w `App`) decyduje, co robi przeciągnięcie zdjęcia: **Kadr** (kadrowanie, krawędzie i kropki też działają), **Układ** (zdjęcie nie kadruje się; przeciągnięcie w dowolnym miejscu zdjęcia rusza jego krawędź bliższą palcowi w osi ruchu – `cellEdge`; uchwyty widoczne, kropki większe), **Zamiana**. Na telefonie trafianie w cienkie krawędzie było zbyt trudne – stąd tryb Układ.
+
+Sposoby chwytania (`useEdgeDrag` w `SheetView`, nasłuch na `window`, bo przebudowa drzewa podmienia elementy; wskaźnik jest przechwytywany przez arkusz – `setPointerCapture` – bo telefon kończy dotyk, gdy dotknięty element znika ze strony; kropki mają `key` = indeks, żeby kropka jadąca z linią zachowała element):
+- **Krawędź** (`Divider`, kursor ↔/↕): rusza się tylko ten odcinek. Przy pierwszym ruchu `isolateSegment` tnie krawędź w każdym krzyżyku, gdzie prostopadła linia przechodzi na drugą stronę w tej samej pozycji (±0,01 mm). Chwycona część zachowuje `splitId`, druga dostaje `{id}~n`.
+- **Zdjęcie w trybie Układ** (`onGrabCell`): kierunek pierwszego ruchu wybiera oś, potem jak przy krawędzi (tylko odcinek przy tym zdjęciu).
+- **Krzyżyk** (`JunctionKnob`, testid `junction`, kursor `move`, kropka): `junctions(layout)` znajduje tylko „+” (nie T). Kierunek pierwszego ruchu (4 px) wybiera linię: w bok → pionowa, w górę/dół → pozioma. `joinLine` łączy części w jednej linii w jeden podział (najwyższy prostopadły przodek, przez który linia przechodzi), więc rusza się najdłuższa spójna linia.
+- Akcje `isolate` / `joinLine` i `setFrac` są `transient` – całe przeciągnięcie to jeden krok cofania. Obraz w chwili przebudowy się nie zmienia (`refit` liczy ułamki z prostokątów pól, z odstępem).
+- Przeciąganie używa akcji `moveEdge` (nie `setFrac`): wszystkie inne krawędzie zostają w miejscu, zmieniają się tylko zdjęcia przy krawędzi (zagnieżdżone podziały w tym samym kierunku dostają przeliczone ułamki). `setFrac` skalowałby wszystko proporcjonalnie, a inne linie „jechałyby” razem z nią.
+- Zakres: żadne zdjęcie przy krawędzi nie spada poniżej `minCellMm` (15 mm, na małych arkuszach 6% krótszego boku). Zakres zawsze obejmuje pozycję startową, więc nic nie skacze.
+- Przyciąganie (6 px, Shift wyłącza): tylko do innych krawędzi w tym samym kierunku – żeby łatwo zrobić krzyżyk. Przyciąganie do środków dawało wrażenie oporu.
+- E2E: `tests/e2e/edges.spec.ts`. Przyciski zoomu komórki leżą nad krawędzią w prawej części pola, więc test dotykowy chwyta krawędź bliżej środka.
 
 ### Napisy
 

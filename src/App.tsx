@@ -20,6 +20,8 @@ import { isProjectFile, PROJECT_EXT, ProjectError } from './storage/project';
 import { loadPref, savePref } from './prefs';
 import { collagesWord, photosWord } from './plural';
 import { toast } from './toast';
+import { demoPhotos } from './demoPhotos';
+import type { Tool } from './components/workspace/ToolSwitch';
 
 type SaveKind = 'project' | 'image';
 /** Last file name per kind, remembered between sessions. */
@@ -29,7 +31,7 @@ const nameKey = (kind: SaveKind) => (kind === 'project' ? 'lastProjectName' : 'l
 export function App() {
   const mosaic = useMosaic();
   const desktop = useMediaQuery(DESKTOP);
-  const [swapMode, setSwapMode] = useState(false);
+  const [tool, setTool] = useState<Tool>('crop');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [tab, setTab] = useState<PanelTab>('options');
   const [newDialog, setNewDialog] = useState(false);
@@ -142,7 +144,7 @@ export function App() {
     mosaic.newProject();
     setNewDialog(false);
     setDrawerOpen(false);
-    setSwapMode(false);
+    setTool('crop');
     toast('Nowy projekt');
   };
 
@@ -150,7 +152,7 @@ export function App() {
     mosaic.startBatch(result.entries, result.docs);
     setAutoDialog(false);
     setBatchOpen(true);
-    setSwapMode(false);
+    setTool('crop');
     const photos = result.docs.reduce((s, d) => s + d.photos.length, 0);
     toast(`Utworzono ${result.docs.length} ${collagesWord(result.docs.length)} z ${photos} ${photosWord(photos)}${result.skipped ? ` (pominięto ${result.skipped})` : ''}`);
   };
@@ -205,9 +207,15 @@ export function App() {
       >
         <Sidebar
           mosaic={mosaic}
-          swapMode={swapMode}
-          onSwapMode={setSwapMode}
           onAddPhotos={() => fileInput.current?.click()}
+          onDemoPhotos={
+            import.meta.env.VITE_DEMO_PHOTOS === '1'
+              ? () => {
+                  toast('Tworzę przykładowe zdjęcia…');
+                  void demoPhotos().then(onFiles);
+                }
+              : undefined
+          }
           dpi={dpi}
           exportType={exportType}
           exporting={exporting}
@@ -302,7 +310,7 @@ export function App() {
         />
       )}
 
-      <Workspace mosaic={mosaic} swapMode={swapMode} onFiles={(f) => void onFiles(f)} />
+      <Workspace mosaic={mosaic} tool={tool} onTool={setTool} onFiles={(f) => void onFiles(f)} />
 
       {desktop && mosaic.batch.length > 0 && (
         <BatchPanel mosaic={mosaic} open={batchOpen} onOpen={setBatchOpen} onSaveAll={() => setSeriesSave(true)} onNewSeries={() => setAutoDialog(true)} />

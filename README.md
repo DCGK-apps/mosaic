@@ -6,10 +6,16 @@ Kreator kolaży zdjęć do druku. Działa w przeglądarce i na telefonie (PWA, t
 ## Funkcje
 
 - **Układy:** Auto (losuje tysiące podziałów i wybiera najlepiej pasujący do proporcji zdjęć, z historią losowań), Siatka, Centralny, Poziomo, Pionowo.
-- **Krawędzie** między zdjęciami można przeciągać (myszą i palcem).
+- **Przełącznik na płótnie: Kadr / Układ / Zamiana** – co robi przeciągnięcie zdjęcia. W trybie **Układ** nie trzeba trafiać w krawędź: przeciągnięcie w dowolnym miejscu zdjęcia przesuwa jego krawędź bliższą palcowi (ruch w bok – lewą lub prawą, w górę/dół – górną lub dolną). Wygodne zwłaszcza na telefonie.
+- **Krawędzie** między zdjęciami można przeciągać (myszą i palcem):
+  - przesuwana krawędź zmienia tylko zdjęcia tuż przy niej, pozostałe krawędzie stoją w miejscu,
+  - krawędź przyciąga się do innych krawędzi w jednej linii (Shift – bez przyciągania), więc łatwo zrobić „krzyżyk”,
+  - chwycenie krawędzi (kursor ↔ / ↕) przesuwa tylko ten jeden odcinek – także połowę linii przeciętej przez inną. Układ przebudowuje się w locie, nic nie przeskakuje,
+  - w krzyżyku jest kropka (kursor ✥): przeciągnięcie jej przesuwa całą najdłuższą spójną linię – w bok pionową, w górę lub w dół poziomą,
+  - pole nie robi się węższe niż 15 mm (na małych arkuszach mniej).
 - **Kadrowanie:** przeciąganie zdjęcia, powiększanie przyciskami, kółkiem myszy lub szczypaniem. Zdjęcie zawsze wypełnia pole, nie da się zrobić pustej dziury.
 - **Napisy:** przycisk „Dodaj napis” nad arkuszem. Napis z polskimi znakami, w kilku liniach, można dowolnie przesuwać, powiększać (kółko w rogu) i obracać (uchwyt u góry, przyciąga do 0°/45°/90°). Pasek pod arkuszem: 7 czcionek (Roboto, Lora, Playfair Display, Oswald, Caveat, Pacifico, Comfortaa – wbudowane, działają offline i wyglądają tak samo na każdym urządzeniu), rozmiar w mm wydruku, pogrubienie, kursywa, podkreślenie, wyrównanie, cień, kolor. Dwuklik na napisie – edycja treści, Delete – usunięcie. Napisy są w eksporcie, projekcie `.mosaic` i autozapisie.
-- **Zamiana miejsc:** przeciągnięcie zdjęcia na inne (działa też dotykiem).
+- **Zamiana miejsc:** w trybie „Zamiana” przeciągnięcie zdjęcia na inne (działa też dotykiem).
 - **Magazyn odłożonych** zdjęć: odłóż, przywróć, usuń trwale.
 - **Wymiary:** gotowe formaty (A4, A3, 30 × 40 cm…) lub własne, obrót pion/poziom; ramka i zaokrąglenie w milimetrach wydruku.
 - **Eksport** do JPG/PNG w 100/150/300 DPI. Plik wygląda dokładnie jak podgląd (ta sama geometria).
@@ -54,6 +60,8 @@ src/
     geometry.ts  położenie pól i krawędzi w mm – wspólne dla podglądu i eksportu
     crop.ts      kadrowanie i powiększenie
     tree.ts      operacje na drzewie (krawędzie, zamiana, usuwanie)
+    restructure.ts  przebudowa drzewa bez zmiany obrazu (osobne odcinki przeciętej krawędzi)
+    edges.ts     przeciąganie krawędzi: zakres (minimalne pole), przyciąganie, wybór krawędzi pod palcem
     doc.ts       reducer dokumentu (wszystkie zmiany stanu)
     history.ts   cofnij/ponów, przeciąganie = jeden krok
     export.ts    rysowanie na canvasie, rozdzielczość, limity przeglądarek
