@@ -30,6 +30,8 @@ export interface SidebarProps {
   onNewProject: () => void;
   /** Computer only: "Kolaże z folderu" – an automatic series of collages. */
   onAutoCollage?: () => void;
+  /** Preview builds only: adds generated sample photos. */
+  onDemoPhotos?: () => void;
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   /** Mobile only: closes the drawer. */
@@ -118,6 +120,16 @@ export function Sidebar(props: SidebarProps) {
       <div className={cx('p-6 md:pb-0', tab !== 'photos' && 'max-md:hidden')} role="tabpanel" data-testid="panel-photos">
         <div>
           <PhotosSection photos={doc.photos} urlOf={urlOf} onAdd={onAddPhotos} onRemove={(photoId) => act({ type: 'toMagazine', photoId })} />
+          {props.onDemoPhotos && (
+            <button
+              type="button"
+              onClick={props.onDemoPhotos}
+              data-testid="demo-photos"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-brand py-2.5 text-sm font-bold text-brand transition-colors hover:bg-blue-50"
+            >
+              Przykładowe zdjęcia (wersja testowa)
+            </button>
+          )}
           {props.onAutoCollage && (
             <button
               type="button"

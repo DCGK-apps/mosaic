@@ -20,6 +20,7 @@ import { isProjectFile, PROJECT_EXT, ProjectError } from './storage/project';
 import { loadPref, savePref } from './prefs';
 import { collagesWord, photosWord } from './plural';
 import { toast } from './toast';
+import { demoPhotos } from './demoPhotos';
 
 type SaveKind = 'project' | 'image';
 /** Last file name per kind, remembered between sessions. */
@@ -208,6 +209,14 @@ export function App() {
           swapMode={swapMode}
           onSwapMode={setSwapMode}
           onAddPhotos={() => fileInput.current?.click()}
+          onDemoPhotos={
+            import.meta.env.VITE_DEMO_PHOTOS === '1'
+              ? () => {
+                  toast('Tworzę przykładowe zdjęcia…');
+                  void demoPhotos().then(onFiles);
+                }
+              : undefined
+          }
           dpi={dpi}
           exportType={exportType}
           exporting={exporting}

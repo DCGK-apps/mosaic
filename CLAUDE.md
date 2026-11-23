@@ -80,6 +80,8 @@ src/download.ts    pobranie bloba przez <a download>
 src/prefs.ts       localStorage „mosaic.prefs” (loadPref/savePref)
 src/pwa.ts sw-template.js  instalacja, baner „Dostępna nowa wersja”; sw.js generuje vite.config.ts
 src/toast.ts       krótki komunikat na górze ekranu
+src/demoPhotos.ts  przykładowe zdjęcia (canvas) – przycisk `demo-photos` tylko w buildzie z VITE_DEMO_PHOTOS=1
+                   (wersja testowa w podglądzie Claude, gdzie na telefonie nie działa wybór plików)
 src/fonts.ts       czcionki napisów: registerFonts (FontFace z public/fonts, podzbiory latin/latin-ext),
                    loadFonts (przed eksportem), useTextMeasure (nowy pomiar po wczytaniu czcionki)
 ```
