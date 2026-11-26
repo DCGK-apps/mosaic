@@ -57,6 +57,40 @@ test('the saved file looks like the preview: same cells, frame and colours', asy
   expect(near(px[3]!, [0, 255, 0]), `frame: ${px[3]}`).toBe(true);
 });
 
+test('"Ramka dookoła" (off by default) puts the frame around the whole collage, on screen and in the file', async ({ page }) => {
+  await openApp(page);
+  await addPhotos(page, ['landscape', 'square']);
+  await inPanel(page, async () => {
+    await expect(page.getByTestId('outer-frame')).not.toBeChecked();
+    await page.getByTestId('mode-cols').click();
+    await page.getByTestId('gap').fill('20');
+    await page.getByTestId('frame-color').fill('#00ff00');
+    await page.getByTestId('dpi').selectOption('100');
+  });
+  const sheet = (await page.getByTestId('sheet').boundingBox())!;
+  // Without it the photos reach the sheet's edges.
+  expect((await cells(page).first().boundingBox())!.x - sheet.x).toBeCloseTo(0, 0);
+
+  await inPanel(page, () => page.getByTestId('outer-frame').check());
+  const frame = (20 * sheet.width) / 504;
+  const first = (await cells(page).first().boundingBox())!;
+  expect(first.x - sheet.x).toBeCloseTo(frame, 0);
+  expect(first.y - sheet.y).toBeCloseTo(frame, 0);
+  expect((await getDoc(page)).sheet.outerFrame).toBe(true);
+
+  // 20 mm at 100 DPI is about 79 px: the border is frame-coloured on every side, photos start inside it.
+  const file = await exportFile(page);
+  const { px } = await pixels(page, file.data, 'image/jpeg', [
+    [40, 1000],
+    [1944, 1000],
+    [1000, 40],
+    [1000, 1952],
+    [120, 1000],
+  ]);
+  for (const p of px.slice(0, 4)) expect(near(p, [0, 255, 0]), `frame: ${p}`).toBe(true);
+  expect(near(px[4]!, [0, 255, 0]), `photo: ${px[4]}`).toBe(false);
+});
+
 test('PNG export with the chosen resolution', async ({ page }) => {
   await openApp(page);
   await addPhotos(page, ['square']);

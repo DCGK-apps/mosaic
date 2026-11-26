@@ -1,5 +1,5 @@
-import { computeLayout, type DividerBox } from './geometry';
-import type { Dir, Node, Rect, Sheet, Split } from './types';
+import { computeLayout, type DividerBox, type LayoutSheet } from './geometry';
+import type { Dir, Node, Rect, Split } from './types';
 
 /**
  * Geometry-preserving rewrites of the layout tree.
@@ -152,7 +152,7 @@ function pathTo(n: Node, id: string): Split[] | null {
  * as the line runs straight across crossings (the inverse of cutting it). The
  * picture does not change. Returns the same tree when there is nothing to join.
  */
-export function joinLine(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, newId?: () => string): Node {
+export function joinLine(tree: Node, sheet: LayoutSheet, splitId: string, newId?: () => string): Node {
   const s = find(tree, splitId);
   const path = pathTo(tree, splitId);
   if (!s || s.kind !== 'split' || !path) return tree;
@@ -185,7 +185,7 @@ export function joinLine(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' |
  * the drag can go on with the same id. A point inside a crossing cuts nothing
  * (moving the whole line from a crossing is `joinLine`).
  */
-export function isolateSegment(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, at: { x: number; y: number }): Node {
+export function isolateSegment(tree: Node, sheet: LayoutSheet, splitId: string, at: { x: number; y: number }): Node {
   const ids = allIds(tree);
   let counter = 0;
   const newId = (): string => {

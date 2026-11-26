@@ -100,6 +100,8 @@ describe('docReducer', () => {
   it('sheet values are kept in range; rotating swaps the sides', () => {
     const doc = run(emptyDoc(), { type: 'setSheet', patch: { widthMm: 1, gapMm: 999, radiusMm: -3 } });
     expect(doc.sheet).toMatchObject({ widthMm: 10, gapMm: MAX_GAP_MM, radiusMm: 0 });
+    expect(doc.sheet.outerFrame).toBe(false);
+    expect(run(emptyDoc(), { type: 'setSheet', patch: { outerFrame: true } }).sheet.outerFrame).toBe(true);
     const rotated = run({ ...emptyDoc(), sheet: { ...emptyDoc().sheet, widthMm: 210, heightMm: 297 } }, { type: 'rotateSheet' });
     expect(rotated.sheet).toMatchObject({ widthMm: 297, heightMm: 210 });
     expect(run(doc, { type: 'setSheet', patch: { gapMm: MAX_GAP_MM } })).toBe(doc);

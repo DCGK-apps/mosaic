@@ -29,14 +29,15 @@ src/core/          czysta logika (testy w tests/unit)
   types.ts         model: Doc { photos, magazine, sheet, mode, tree, autoHistory, autoIndex, texts? }
                    TextBox: x,y = środek jako ułamek arkusza 0..1, sizeMm, font, bold/italic/underline, rotation…
                    tree = drzewo binarne: Leaf{photoId} | Split{dir 'V'|'H', frac, a, b}
-                   Sheet w mm: widthMm, heightMm, gapMm, radiusMm, frameColor
+                   Sheet w mm: widthMm, heightMm, gapMm, radiusMm, frameColor, outerFrame? (ramka dookoła, domyślnie false)
                    Crop {x,y ∈ -1..1, zoom ≥ 1} – zdjęcie zawsze „cover”
   doc.ts           docReducer + DocAction (addPhotos, toMagazine, fromMagazine, deleteFromMagazine,
                    setMode, shuffle, autoStep, setFrac, moveEdge, isolate, joinLine, swap, setCrop, setSheet, rotateSheet,
                    addText, updateText, deleteText);
                    akcje losowe dostają `seed` (reducer jest czysty), DEFAULT_SHEET, emptyDoc
   layouts.ts       generatory układów (auto losuje wiele drzew i ocenia dopasowanie proporcji)
-  geometry.ts      prostokąty pól/krawędzi w mm – WSPÓLNE dla podglądu i eksportu
+  geometry.ts      prostokąty pól/krawędzi w mm – WSPÓLNE dla podglądu i eksportu; sheetArea = obszar na zdjęcia
+                   (przy outerFrame pomniejszony o gapMm z każdej strony) – używaj go zamiast 0,0,W,H
   text.ts          napisy: FONTS, newTextBox, cleanText, layoutText (linie w mm – WSPÓLNE dla podglądu
                    i eksportu; pomiar przez Measure = canvas measureText), fontCss, moveText, snapAngle
   crop.ts tree.ts  kadrowanie; operacje na drzewie (setFrac ma tylko bezpieczne granice 1–99%)

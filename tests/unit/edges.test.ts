@@ -42,6 +42,18 @@ describe('edges', () => {
     expect((moveEdge(simple, sheet, 's', 0.3) as typeof simple).frac).toBe(0.3);
   });
 
+  it('moveEdge keeps other edges in place with a frame around the collage too', () => {
+    const framed = { ...sheet, outerFrame: true };
+    const tree = split('c1', 'V', 0.5, leaf('a'), split('c2', 'V', 0.5, leaf('b'), leaf('c')));
+    const before = computeLayout(tree, framed);
+    const after = computeLayout(moveEdge(tree, framed, 'c1', 0.3), framed);
+    const at = (l: typeof before, id: string) => l.dividers.find((d) => d.splitId === id)!;
+    expect(at(after, 'c1').x).toBeCloseTo(6 + 0.3 * (300 - 12 - 6));
+    expect(at(after, 'c2').x).toBeCloseTo(at(before, 'c2').x, 9);
+    const c = after.cells.find((x) => x.leafId === 'c')!;
+    expect(c.x + c.w).toBeCloseTo(300 - 6);
+  });
+
   it('a drag never jumps, even when the edge already is beyond the limit', () => {
     const tree = split('s', 'V', 0.02, leaf('a'), leaf('b'));
     const drag = beginEdgeDrag(tree, sheet, 's')!;

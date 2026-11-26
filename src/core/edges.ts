@@ -1,4 +1,4 @@
-import { computeLayout, type DividerBox, type Layout } from './geometry';
+import { computeLayout, sheetArea, type DividerBox, type Layout, type LayoutSheet } from './geometry';
 import type { Dir, Node, Sheet } from './types';
 
 /**
@@ -43,7 +43,7 @@ export interface EdgeDrag {
 
 const pos = (d: DividerBox) => (d.dir === 'V' ? d.x : d.y);
 
-export function beginEdgeDrag(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string): EdgeDrag | null {
+export function beginEdgeDrag(tree: Node, sheet: LayoutSheet, splitId: string): EdgeDrag | null {
   const layout = computeLayout(tree, sheet);
   const d = layout.dividers.find((x) => x.splitId === splitId);
   const node = findSplit(tree, splitId);
@@ -161,7 +161,7 @@ export function cellEdge(layout: Layout, cell: { x: number; y: number; w: number
  * fraction alone would scale everything on both sides proportionally, so
  * other edges would drift along.)
  */
-export function moveEdge(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>, splitId: string, frac: number): Node {
+export function moveEdge(tree: Node, sheet: LayoutSheet, splitId: string, frac: number): Node {
   const node = findSplit(tree, splitId);
   if (!node || node.kind !== 'split') return tree;
   // Edges inside the moved split, parallel to it, keep their place on the sheet.
@@ -186,5 +186,6 @@ export function moveEdge(tree: Node, sheet: Pick<Sheet, 'widthMm' | 'heightMm' |
     const b = vertical ? walk(n.b, x + first + g, y, w - first - g, h) : walk(n.b, x, y + first + g, w, h - first - g);
     return a === n.a && b === n.b && nf === n.frac ? n : { ...n, frac: nf, a, b };
   };
-  return walk(tree, 0, 0, Math.max(0, sheet.widthMm), Math.max(0, sheet.heightMm));
+  const area = sheetArea(sheet);
+  return walk(tree, area.x, area.y, area.w, area.h);
 }

@@ -57,6 +57,8 @@ export interface Sheet {
   radiusMm: number;
   /** Colour of the frame (the sheet background). */
   frameColor: string;
+  /** The frame also runs around the whole collage (gapMm wide); without it photos reach the sheet's edges. */
+  outerFrame?: boolean;
 }
 
 export type LayoutMode = 'auto' | 'grid' | 'central' | 'rows' | 'cols';

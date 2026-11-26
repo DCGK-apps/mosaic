@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellRadius, computeLayout } from '../../src/core/geometry';
+import { cellRadius, computeLayout, sheetArea } from '../../src/core/geometry';
 import { leaf, split } from './helpers';
 
 const sheet = { widthMm: 210, heightMm: 100, gapMm: 10 };
@@ -34,6 +34,21 @@ describe('computeLayout', () => {
     expect(computeLayout(leaf('a'), sheet).cells[0]).toMatchObject({ x: 0, y: 0, w: 210, h: 100 });
     const tiny = computeLayout(split('s', 'H', 0.5, leaf('a'), leaf('b')), { widthMm: 10, heightMm: 4, gapMm: 50 });
     expect(tiny.cells.every((c) => c.h >= 0)).toBe(true);
+  });
+
+  it('with a frame around, the photos sit inside a border as wide as the gap', () => {
+    const framed = { ...sheet, outerFrame: true };
+    expect(sheetArea(framed)).toEqual({ x: 10, y: 10, w: 190, h: 80 });
+    expect(sheetArea(sheet)).toEqual({ x: 0, y: 0, w: 210, h: 100 });
+    const { cells } = computeLayout(split('s', 'V', 0.5, leaf('a'), leaf('b')), framed);
+    expect(cells.map(({ x, y, w, h }) => [x, y, w, h])).toEqual([
+      [10, 10, 90, 80],
+      [110, 10, 90, 80],
+    ]);
+    // A frame too wide for the sheet still leaves room for the photos.
+    const tiny = sheetArea({ widthMm: 20, heightMm: 10, gapMm: 50, outerFrame: true });
+    expect(tiny.w).toBeGreaterThan(0);
+    expect(tiny.h).toBeCloseTo(1);
   });
 
   it('caps the corner radius at half the shorter side', () => {
