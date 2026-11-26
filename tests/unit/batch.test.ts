@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchCopy, buildBatch, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, writeBack, type BatchOptions } from '../../src/core/batch';
+import { batchCopy, buildBatch, checkCount, clampCount, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, writeBack, type BatchOptions } from '../../src/core/batch';
 import { currentTree, DEFAULT_SHEET, docReducer } from '../../src/core/doc';
 import { leaves } from '../../src/core/tree';
 import { photo } from './helpers';
@@ -98,6 +98,68 @@ describe('planBatch', () => {
 
   it('returns nothing for no photos', async () => {
     expect(await planBatch([], opts(2, 3), 1)).toEqual([]);
+  });
+});
+
+describe('checkCount', () => {
+  it('splits photos as evenly as possible', () => {
+    expect(checkCount(10, 3)).toEqual({ kind: 'ok', small: 3, big: 4, suggest: 3 });
+    expect(checkCount(12, 3)).toEqual({ kind: 'ok', small: 4, big: 4, suggest: 3 });
+    expect(checkCount(0, 3).kind).toBe('ok');
+  });
+
+  it('suggests one collage per photo when there are fewer photos than collages', () => {
+    expect(checkCount(7, 10)).toEqual({ kind: 'fewPhotos', small: 1, big: 1, suggest: 7 });
+  });
+
+  it('warns above 20 photos per collage and refuses above 40, suggesting at most 20 each', () => {
+    expect(checkCount(100, 5).kind).toBe('ok');
+    expect(checkCount(100, 3)).toEqual({ kind: 'large', small: 33, big: 34, suggest: 5 });
+    expect(checkCount(100, 2)).toEqual({ kind: 'tooLarge', small: 50, big: 50, suggest: 5 });
+    expect(checkCount(80, 2)).toEqual({ kind: 'large', small: 40, big: 40, suggest: 4 });
+  });
+
+  it('keeps the count sensible', () => {
+    expect(clampCount(0)).toBe(1);
+    expect(clampCount(Number.NaN)).toBe(1);
+    expect(clampCount(2.6)).toBe(3);
+    expect(clampCount(10_000)).toBe(500);
+  });
+});
+
+describe('planBatch with a number of collages', () => {
+  const byCount = (count: number, mode: BatchOptions['mode'] = 'auto'): BatchOptions => ({ ...opts(1, 1, mode), count });
+
+  it('makes exactly that many collages, sizes differing by at most one', async () => {
+    for (const [n, count] of [
+      [10, 3],
+      [10, 4],
+      [23, 5],
+      [7, 7],
+      [45, 2],
+    ] as const) {
+      const sizes = await planBatch(photos(n), byCount(count), 1);
+      expect(sizes).toHaveLength(count);
+      expect(sum(sizes)).toBe(n);
+      expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('splits evenly without planning when it divides exactly', async () => {
+    expect(await planBatch(photos(12), byCount(4), 1)).toEqual([3, 3, 3, 3]);
+  });
+
+  it('makes one collage per photo when fewer photos were read than asked for', async () => {
+    expect(await planBatch(photos(3), byCount(5), 1)).toEqual([1, 1, 1]);
+  });
+
+  it('puts the extra photos where they fit the layout best', async () => {
+    // 9 photos into 2 collages: 4 + 5 or 5 + 4 – the choice is deterministic for a seed.
+    const ticks: number[] = [];
+    const a = await planBatch(photos(9), byCount(2, 'grid'), 3, (done) => void ticks.push(done));
+    expect(await planBatch(photos(9), byCount(2, 'grid'), 3)).toEqual(a);
+    expect(a.toSorted()).toEqual([4, 5]);
+    expect(ticks.at(-1)).toBe(9);
   });
 });
 

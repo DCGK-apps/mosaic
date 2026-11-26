@@ -1,6 +1,6 @@
 import { FolderOpen, LayoutDashboard, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { clampRange, collageCount, inChosenFolder, MAX_BATCH_PHOTOS, MAX_PER_COLLAGE, type BatchOrder } from '../core/batch';
+import { checkCount, clampCount, clampRange, collageCount, HARD_MAX_PER_COLLAGE, inChosenFolder, MAX_BATCH_PHOTOS, MAX_PER_COLLAGE, type BatchOrder } from '../core/batch';
 import { docReducer, emptyDoc } from '../core/doc';
 import type { LayoutMode, Sheet } from '../core/types';
 import { Cancelled, createSeries, folderName, pathOf, photoFiles, type Progress, type SeriesResult } from '../autoCollage';
@@ -22,6 +22,9 @@ interface Props {
   onCancel: () => void;
 }
 
+/** How the photos are split: by photos per collage (min–max) or into a chosen number of collages. */
+type Split = 'size' | 'count';
+
 const field = 'w-16 rounded-md border border-slate-300 bg-white p-2 text-center text-sm font-medium focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand';
 
 
@@ -38,6 +41,10 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
   const nested = allFiles.length - allFiles.filter((f) => inChosenFolder(pathOf(f))).length;
   const [min, setMin] = useState(() => loadPref('autoMin', 3));
   const [max, setMax] = useState(() => loadPref('autoMax', 6));
+  const [split, setSplit] = useState<Split>(() => (loadPref<string>('autoSplit', 'size') === 'count' ? 'count' : 'size'));
+  const [countInput, setCountInput] = useState(() => clampCount(loadPref('autoCount', 4)));
+  /** The warning about big collages is shown before creating (count mode only). */
+  const [confirmLarge, setConfirmLarge] = useState(false);
   const [order, setOrder] = useState<BatchOrder>(() => (loadPref<string>('autoOrder', 'date') === 'name' ? 'name' : 'date'));
   const [mode, setMode] = useState<LayoutMode>(initialMode);
   const [sheet, setSheet] = useState<Sheet>(initialSheet);
@@ -50,6 +57,9 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
   const range = clampRange(min, max);
   const used = Math.min(files.length, MAX_BATCH_PHOTOS);
   const count = collageCount(used, range.min, range.max);
+  const collages = clampCount(countInput);
+  const check = checkCount(used, collages);
+  const blocked = split === 'count' && (check.kind === 'fewPhotos' || check.kind === 'tooLarge');
 
   useEffect(() => {
     // `webkitdirectory` is not in React's attribute list.
@@ -60,24 +70,33 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (busy) cancelled.current = true;
+      else if (confirmLarge) setConfirmLarge(false);
       else onCancel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onCancel]);
+  }, [busy, confirmLarge, onCancel]);
 
-  const start = async () => {
+  /** `n` – number of collages to make in count mode (the suggested one or the user's after the warning). */
+  const start = async (n?: number) => {
     savePref('autoMin', range.min);
     savePref('autoMax', range.max);
     savePref('autoOrder', order);
     savePref('autoSubfolders', subfolders);
+    savePref('autoSplit', split);
     setMin(range.min);
     setMax(range.max);
+    const target = n ?? collages;
+    if (split === 'count') {
+      savePref('autoCount', target);
+      setCountInput(target);
+    }
+    setConfirmLarge(false);
     setError('');
     cancelled.current = false;
     setProgress({ stage: 'read', done: 0, total: used });
     try {
-      const result = await createSeries(files, order, { min: range.min, max: range.max, mode, sheet }, setProgress, () => cancelled.current);
+      const result = await createSeries(files, order, { min: range.min, max: range.max, count: split === 'count' ? target : undefined, mode, sheet }, setProgress, () => cancelled.current);
       if (result.docs.length === 0) {
         setError('Nie udało się wczytać żadnego zdjęcia z tego folderu');
         setProgress(null);
@@ -88,6 +107,11 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
       setProgress(null);
       if (!(e instanceof Cancelled)) setError('Nie udało się utworzyć kolaży');
     }
+  };
+
+  const create = () => {
+    if (split === 'count' && check.kind === 'large') setConfirmLarge(true);
+    else void start();
   };
 
   const percent = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -163,39 +187,112 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
             </div>
 
             <div>
-              <SectionTitle>Liczba zdjęć w kolażu</SectionTitle>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                od
-                <input
-                  type="number"
-                  min={1}
-                  max={MAX_PER_COLLAGE}
-                  value={min}
-                  onChange={(e) => setMin(Number(e.target.value))}
-                  onBlur={() => setMin(clampRange(min, MAX_PER_COLLAGE).min)}
-                  className={field}
-                  data-testid="auto-min"
-                />
-                do
-                <input
-                  type="number"
-                  min={1}
-                  max={MAX_PER_COLLAGE}
-                  value={max}
-                  onChange={(e) => setMax(Number(e.target.value))}
-                  onBlur={() => setMax(clampRange(1, max).max)}
-                  className={field}
-                  data-testid="auto-max"
-                />
+              <SectionTitle>Podział zdjęć</SectionTitle>
+              <div className="mb-3 flex rounded-lg bg-slate-200 p-1" role="radiogroup" aria-label="Podział zdjęć">
+                {(
+                  [
+                    ['size', 'Liczba zdjęć w kolażu'],
+                    ['count', 'Liczba kolaży'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={split === id}
+                    onClick={() => {
+                      setSplit(id);
+                      setConfirmLarge(false);
+                    }}
+                    data-testid={`auto-split-${id}`}
+                    className={cx('flex-1 rounded-md py-1.5 text-xs font-medium transition-all', split === id ? 'bg-white text-brand shadow' : 'text-slate-500 hover:text-slate-700')}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-              {used > 0 && (
-                <p className="mt-2 text-xs text-slate-500" data-testid="auto-estimate">
-                  {count
-                    ? count.lo === count.hi
-                      ? `Powstanie ${count.lo} ${collagesWord(count.lo)}.`
-                      : `Powstanie od ${count.lo} do ${count.hi} kolaży – program wybierze podział, w którym zdjęcia najlepiej pasują do układu.`
-                    : `${used} ${photosWord(used)} nie da się podzielić dokładnie po ${range.min === range.max ? range.min : `${range.min}–${range.max}`} – jeden kolaż będzie miał inną liczbę zdjęć.`}
-                </p>
+              {split === 'size' ? (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    od
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_PER_COLLAGE}
+                      value={min}
+                      onChange={(e) => setMin(Number(e.target.value))}
+                      onBlur={() => setMin(clampRange(min, MAX_PER_COLLAGE).min)}
+                      className={field}
+                      data-testid="auto-min"
+                    />
+                    do
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_PER_COLLAGE}
+                      value={max}
+                      onChange={(e) => setMax(Number(e.target.value))}
+                      onBlur={() => setMax(clampRange(1, max).max)}
+                      className={field}
+                      data-testid="auto-max"
+                    />
+                    zdjęć
+                  </div>
+                  {used > 0 && (
+                    <p className="mt-2 text-xs text-slate-500" data-testid="auto-estimate">
+                      {count
+                        ? count.lo === count.hi
+                          ? `Powstanie ${count.lo} ${collagesWord(count.lo)}.`
+                          : `Powstanie od ${count.lo} do ${count.hi} kolaży – program wybierze podział, w którym zdjęcia najlepiej pasują do układu.`
+                        : `${used} ${photosWord(used)} nie da się podzielić dokładnie po ${range.min === range.max ? range.min : `${range.min}–${range.max}`} – jeden kolaż będzie miał inną liczbę zdjęć.`}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    Zrób
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_BATCH_PHOTOS}
+                      value={countInput}
+                      onChange={(e) => {
+                        setCountInput(Number(e.target.value));
+                        setConfirmLarge(false);
+                      }}
+                      onBlur={() => setCountInput(collages)}
+                      className={field}
+                      data-testid="auto-count"
+                    />
+                    {collagesWord(collages)}
+                  </div>
+                  {used > 0 &&
+                    (check.kind === 'fewPhotos' || check.kind === 'tooLarge' ? (
+                      <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800" data-testid="auto-count-problem">
+                        <p>
+                          {check.kind === 'fewPhotos'
+                            ? `Zdjęć jest tylko ${used} – można zrobić najwyżej ${used} ${collagesWord(used)}.`
+                            : `W kolażu może być najwyżej ${HARD_MAX_PER_COLLAGE} zdjęć, a tu wyszłoby po ${check.big}.`}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setCountInput(check.suggest)}
+                          className="mt-1.5 rounded-md bg-white px-2.5 py-1 font-bold text-brand shadow-sm hover:bg-slate-50"
+                          data-testid="auto-count-fix"
+                        >
+                          Zrób {check.suggest} {collagesWord(check.suggest)}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className={cx('mt-2 text-xs', check.kind === 'large' ? 'text-amber-700' : 'text-slate-500')} data-testid="auto-estimate">
+                        {check.small === check.big
+                          ? `Każdy kolaż będzie miał ${check.big} ${photosWord(check.big)}.`
+                          : `Kolaże będą miały po ${check.small}–${check.big} ${photosWord(check.big)} – program wybierze, które dostaną o jedno więcej.`}
+                        {check.kind === 'large' && ` To dużo – zalecane najwyżej ${MAX_PER_COLLAGE}.`}
+                      </p>
+                    ))}
+                </>
               )}
             </div>
 
@@ -277,6 +374,32 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
                 </button>
               </div>
             </div>
+          ) : confirmLarge ? (
+            <div role="alertdialog" aria-labelledby="auto-large-title" data-testid="auto-large">
+              <p id="auto-large-title" className="text-sm font-bold text-slate-900">
+                To będą duże kolaże: po {check.small === check.big ? check.big : `${check.small}–${check.big}`} {photosWord(check.big)}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Zalecane jest najwyżej {MAX_PER_COLLAGE} zdjęć w kolażu – przy większej liczbie zdjęcia są małe, a układ trudniej poprawiać. Proponuję{' '}
+                {check.suggest} {collagesWord(check.suggest)}.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                <button type="button" onClick={() => setConfirmLarge(false)} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100" data-testid="auto-large-back">
+                  Wróć do ustawień
+                </button>
+                <button type="button" onClick={() => void start()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" data-testid="auto-large-anyway">
+                  Wiem, zrób mimo to
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void start(check.suggest)}
+                  className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
+                  data-testid="auto-large-suggest"
+                >
+                  <LayoutDashboard className="h-4 w-4" /> Dobrze, zrób {check.suggest} {collagesWord(check.suggest)}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center justify-end gap-2">
               {existing > 0 && <span className="mr-auto text-xs text-amber-700">Obecna seria ({existing}) zostanie zastąpiona.</span>}
@@ -285,8 +408,8 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
               </button>
               <button
                 type="button"
-                onClick={() => void start()}
-                disabled={used === 0}
+                onClick={create}
+                disabled={used === 0 || blocked}
                 className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-40"
                 data-testid="auto-create"
               >
