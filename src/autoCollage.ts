@@ -3,7 +3,7 @@
  * of photos and saving all the collages at once. The planning itself is in
  * core/batch.ts.
  */
-import { buildBatch, MAX_BATCH_PHOTOS, planBatch, seriesFileBase, sortFiles, type BatchOptions, type BatchOrder } from './core/batch';
+import { buildBatch, MAX_BATCH_PHOTOS, MAX_TUNED_PHOTOS, planBatch, tuneGroups, seriesFileBase, sortFiles, type BatchOptions, type BatchOrder } from './core/batch';
 import { DEFAULT_CROP } from './core/crop';
 import { exportExt, type ExportType } from './core/export';
 import { EXIF_BYTES, exifDate } from './core/exif';
@@ -113,17 +113,23 @@ export async function createSeries(
   };
 
   try {
+    // "Losowo" with not too many photos: the app also picks which photos go together.
+    const tune = order === 'random' && photos.length <= MAX_TUNED_PHOTOS;
     let last = 0;
-    const sizes = await planBatch(photos, opts, seed, async (done, total) => {
+    /** Progress of one step, `from`…`to` of the whole planning. */
+    const step = (from: number, to: number) => async (done: number, total: number) => {
       check();
       const now = performance.now();
       if (now - last < 50) return;
       last = now;
-      onProgress({ stage: 'plan', done, total });
+      onProgress({ stage: 'plan', done: Math.round((from + (to - from) * (total ? done / total : 1)) * 1000), total: 1000 });
       await new Promise((r) => setTimeout(r, 0));
-    });
+    };
+    const sizes = await planBatch(photos, opts, seed, step(0, tune ? 0.5 : 1));
     check();
-    return { docs: buildBatch(photos, sizes, opts, seed), entries, skipped: sorted.length - photos.length };
+    const ordered = tune ? await tuneGroups(photos, sizes, opts, seed, step(0.5, 1)) : photos;
+    check();
+    return { docs: buildBatch(ordered, sizes, opts, seed), entries, skipped: sorted.length - photos.length };
   } catch (e) {
     free();
     throw e;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchCopy, buildBatch, checkCount, clampCount, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, writeBack, type BatchOptions } from '../../src/core/batch';
+import { batchCopy, buildBatch, checkCount, clampCount, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, tuneGroups, writeBack, type BatchOptions } from '../../src/core/batch';
 import { currentTree, DEFAULT_SHEET, docReducer } from '../../src/core/doc';
 import { leaves } from '../../src/core/tree';
 import { photo } from './helpers';
@@ -169,6 +169,37 @@ describe('planBatch with a number of collages', () => {
     expect(await planBatch(photos(9), byCount(2, 'grid'), 3)).toEqual(a);
     expect(a.toSorted()).toEqual([4, 5]);
     expect(ticks.at(-1)).toBe(9);
+  });
+});
+
+describe('tuneGroups', () => {
+  const sheet = { ...DEFAULT_SHEET };
+  // Wide and tall photos taken in turns: a wide one and a tall one never fit one sheet well together.
+  const mixed = Array.from({ length: 8 }, (_, i) => (i % 2 ? photo(`t${i}`, 1000, 4000) : photo(`w${i}`, 4000, 1000)));
+
+  it('puts photos that fit together into the same collage, keeping every photo and the sizes', async () => {
+    const tuned = await tuneGroups(mixed, [2, 2, 2, 2], { mode: 'auto', sheet }, 1);
+    expect(tuned.map((p) => p.id).toSorted()).toEqual(mixed.map((p) => p.id).toSorted());
+    for (let g = 0; g < 4; g++) {
+      const kinds = new Set(tuned.slice(g * 2, g * 2 + 2).map((p) => p.id[0]));
+      expect(kinds.size).toBe(1);
+    }
+  });
+
+  it('is deterministic for a seed, reports progress and can be cancelled', async () => {
+    const ticks: number[] = [];
+    const a = await tuneGroups(mixed, [3, 5], { mode: 'auto', sheet }, 4, (done, total) => void ticks.push(done / total));
+    expect(await tuneGroups(mixed, [3, 5], { mode: 'auto', sheet }, 4)).toEqual(a);
+    expect(ticks.at(-1)).toBe(1);
+    await expect(
+      tuneGroups(mixed, [4, 4], { mode: 'auto', sheet }, 4, () => {
+        throw new Error('stop');
+      }),
+    ).rejects.toThrow('stop');
+  });
+
+  it('leaves a single collage as it is', async () => {
+    expect(await tuneGroups(mixed, [8], { mode: 'grid', sheet }, 1)).toEqual(mixed);
   });
 });
 
