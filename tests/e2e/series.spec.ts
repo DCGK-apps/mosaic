@@ -54,8 +54,15 @@ test.describe('computer', () => {
 
     await page.getByTestId('auto-collage').click();
     await expect(page.getByTestId('auto-subfolders')).not.toBeChecked();
+    await expect(page.getByTestId('auto-privacy')).toContainText('nie są nigdzie wysyłane');
     await page.getByTestId('auto-folder-input').setInputFiles(root);
-    await expect(page.getByTestId('auto-folder-info')).toHaveText('Wakacje: 3 zdjęcia (+2 w podfolderach)');
+    await expect(page.getByTestId('auto-folder-info')).toHaveText('Wakacje: 3 zdjęcia');
+    await expect(page.getByTestId('auto-privacy')).toBeHidden();
+    // Ticking the box counts the photos in subfolders at once; unticking takes them away again.
+    await page.getByTestId('auto-subfolders').check();
+    await expect(page.getByTestId('auto-folder-info')).toHaveText('Wakacje: 5 zdjęć');
+    await page.getByTestId('auto-subfolders').uncheck();
+    await expect(page.getByTestId('auto-folder-info')).toHaveText('Wakacje: 3 zdjęcia');
     await page.getByTestId('auto-min').fill('5');
     await page.getByTestId('auto-max').fill('5');
     await page.getByTestId('auto-create').click();

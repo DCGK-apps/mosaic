@@ -38,7 +38,6 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
   const [folder, setFolder] = useState('');
   const [subfolders, setSubfolders] = useState(() => loadPref<unknown>('autoSubfolders', false) === true);
   const files = subfolders ? allFiles : allFiles.filter((f) => inChosenFolder(pathOf(f)));
-  const nested = allFiles.length - allFiles.filter((f) => inChosenFolder(pathOf(f))).length;
   const [min, setMin] = useState(() => loadPref('autoMin', 3));
   const [max, setMax] = useState(() => loadPref('autoMax', 6));
   const [split, setSplit] = useState<Split>(() => (loadPref<string>('autoSplit', 'size') === 'count' ? 'count' : 'size'));
@@ -164,10 +163,15 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
                     setError('');
                   }}
                 />
+                {!folder && (
+                  <p className="mt-2 text-xs text-slate-500" data-testid="auto-privacy">
+                    Przeglądarka zapyta, czy „przesłać” pliki do tej witryny – to jej standardowe pytanie. Zdjęcia nie są nigdzie wysyłane: aplikacja tylko je
+                    odczytuje, a one zostają na tym komputerze.
+                  </p>
+                )}
                 {folder && (
                   <p className="mt-2 text-sm text-slate-700" data-testid="auto-folder-info">
                     <b>{folder}</b>: {files.length} {photosWord(files.length)}
-                    {!subfolders && nested > 0 && <span className="text-slate-500"> (+{nested} w podfolderach)</span>}
                     {files.length === 0 && ' – brak zdjęć (JPG, PNG, WebP)'}
                   </p>
                 )}
