@@ -78,9 +78,11 @@ export async function createSeries(
   const check = () => {
     if (cancelled()) throw new Cancelled();
   };
-  const infos = await pool(files, 8, async (file) => ({ file, path: pathOf(file), modified: file.lastModified, taken: await takenAt(file) }));
+  // The date from EXIF is only needed to sort by date.
+  const infos = await pool(files, 8, async (file) => ({ file, path: pathOf(file), modified: file.lastModified, taken: order === 'date' ? await takenAt(file) : undefined }));
   check();
-  const sorted = sortFiles(infos, order).slice(0, MAX_BATCH_PHOTOS);
+  const seed = randomSeed();
+  const sorted = sortFiles(infos, order, seed).slice(0, MAX_BATCH_PHOTOS);
 
   let read = 0;
   const loaded = await pool(sorted, 4, async ({ file }) => {
@@ -111,7 +113,6 @@ export async function createSeries(
   };
 
   try {
-    const seed = randomSeed();
     let last = 0;
     const sizes = await planBatch(photos, opts, seed, async (done, total) => {
       check();

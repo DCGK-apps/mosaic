@@ -24,7 +24,7 @@ export interface BatchOptions {
   sheet: Sheet;
 }
 
-export type BatchOrder = 'date' | 'name';
+export type BatchOrder = 'date' | 'name' | 'random';
 
 /** What is known about a photo file before it is read. */
 export interface FileInfo {
@@ -50,11 +50,21 @@ const natural = new Intl.Collator('pl', { numeric: true, sensitivity: 'base' });
 /**
  * The order of photos in the series. By date: when the photo was taken (or,
  * without EXIF, when the file was last changed), then by name. By name: the way
- * file managers list them – "IMG_2" before "IMG_10".
+ * file managers list them – "IMG_2" before "IMG_10". Random: shuffled, the same
+ * way for the same seed (whatever order the browser lists the files in).
  */
-export function sortFiles<T extends FileInfo>(files: readonly T[], order: BatchOrder): T[] {
+export function sortFiles<T extends FileInfo>(files: readonly T[], order: BatchOrder, seed = 0): T[] {
   const byName = (a: T, b: T) => natural.compare(a.path, b.path);
   if (order === 'name') return files.toSorted(byName);
+  if (order === 'random') {
+    const out = files.toSorted(byName);
+    const rng = createRng(seed);
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [out[i], out[j]] = [out[j]!, out[i]!];
+    }
+    return out;
+  }
   return files.toSorted((a, b) => (a.taken ?? a.modified) - (b.taken ?? b.modified) || byName(a, b));
 }
 

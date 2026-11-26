@@ -44,7 +44,10 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
   const [countInput, setCountInput] = useState(() => clampCount(loadPref('autoCount', 4)));
   /** The warning about big collages is shown before creating (count mode only). */
   const [confirmLarge, setConfirmLarge] = useState(false);
-  const [order, setOrder] = useState<BatchOrder>(() => (loadPref<string>('autoOrder', 'date') === 'name' ? 'name' : 'date'));
+  const [order, setOrder] = useState<BatchOrder>(() => {
+    const saved = loadPref<string>('autoOrder', 'date');
+    return saved === 'name' || saved === 'random' ? saved : 'date';
+  });
   const [mode, setMode] = useState<LayoutMode>(initialMode);
   const [sheet, setSheet] = useState<Sheet>(initialSheet);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -309,6 +312,7 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
                     [
                       ['date', 'Data wykonania'],
                       ['name', 'Nazwa pliku'],
+                      ['random', 'Losowo'],
                     ] as const
                   ).map(([id, label]) => (
                     <button
@@ -325,7 +329,11 @@ export function AutoCollageDialog({ sheet: initialSheet, mode: initialMode, exis
                   ))}
                 </div>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  {order === 'date' ? 'Data zrobienia zdjęcia z aparatu (EXIF), a gdy jej brak – data zmiany pliku.' : 'Jak w Eksploratorze plików: IMG_2 przed IMG_10.'}
+                  {order === 'date'
+                    ? 'Data zrobienia zdjęcia z aparatu (EXIF), a gdy jej brak – data zmiany pliku.'
+                    : order === 'name'
+                      ? 'Jak w Eksploratorze plików: IMG_2 przed IMG_10.'
+                      : 'Zdjęcia zostaną wymieszane – za każdym razem inaczej. Podział na kolaże i ułożenie zdjęć program dobierze sam.'}
                 </p>
               </div>
 

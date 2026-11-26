@@ -48,7 +48,7 @@ src/core/          czysta logika (testy w tests/unit)
   export.ts        drawMosaic (canvas, na końcu drawTexts), canvasMeasure, exportSize (DPI, limity pikseli, iOS), nazwy plików:
                    defaultFileBase(sheet) = "kolaz_{W}x{H}mm", exportExt, exportFileName
   filename.ts      nazwa pliku przy zapisie: suggestName / rememberName / cleanName
-  batch.ts         seria „Kolaże z folderu”: inChosenFolder (bez podfolderów), sortFiles, planBatch (DP – podział na kolaże), buildBatch,
+  batch.ts         seria „Kolaże z folderu”: inChosenFolder (bez podfolderów), sortFiles (date | name | random – tasowanie z seedem), planBatch (DP – podział na kolaże), buildBatch,
                    writeBack, seriesFileBase ("nazwa_001"); MAX_BATCH_PHOTOS = 500, MAX_PER_COLLAGE = 20
   exif.ts          data wykonania z EXIF (DateTimeOriginal / DateTime) z pierwszych 128 KB pliku JPEG
   zip.ts           zapis ZIP bez kompresji (crc32, zipParts)

@@ -23,6 +23,15 @@ describe('sortFiles', () => {
     expect(sortFiles(files, 'date').map((f) => f.path)).toEqual(['F/IMG_2.jpg', 'F/IMG_10.jpg', 'F/IMG_1.jpg']);
   });
 
+  it('shuffles at random, the same way for the same seed whatever the input order', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ path: `F/IMG_${i}.jpg`, modified: i }));
+    const a = sortFiles(many, 'random', 7).map((f) => f.path);
+    expect(sortFiles(many.toReversed(), 'random', 7).map((f) => f.path)).toEqual(a);
+    expect(a.toSorted()).toEqual(many.map((f) => f.path).toSorted());
+    expect(a).not.toEqual(sortFiles(many, 'name').map((f) => f.path));
+    expect(sortFiles(many, 'random', 8).map((f) => f.path)).not.toEqual(a);
+  });
+
   it('breaks date ties by name', () => {
     const same = [{ path: 'b.jpg', modified: 1 }, { path: 'a.jpg', modified: 1 }];
     expect(sortFiles(same, 'date').map((f) => f.path)).toEqual(['a.jpg', 'b.jpg']);
