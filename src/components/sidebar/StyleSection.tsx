@@ -32,6 +32,16 @@ export function StyleSection({ sheet, onSheet, onEnd }: Props) {
             className="w-full accent-brand"
           />
         </label>
+        <label className="mt-1 flex cursor-pointer items-center gap-2 text-xs text-slate-700">
+          <input
+            type="checkbox"
+            checked={sheet.outerFrame === true}
+            onChange={(e) => onSheet({ outerFrame: e.target.checked })}
+            className="h-4 w-4 accent-brand"
+            data-testid="outer-frame"
+          />
+          Ramka dookoła
+        </label>
       </div>
 
       <div className="flex gap-3 pt-2">

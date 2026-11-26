@@ -7,7 +7,7 @@ import { isolateSegment, joinLine } from './restructure';
 import { leaves, removePhoto, setFrac, swapLeaves } from './tree';
 import type { Crop, Doc, LayoutMode, Node, Photo, Sheet } from './types';
 
-export const DEFAULT_SHEET: Sheet = { widthMm: 504, heightMm: 506, gapMm: 5, radiusMm: 0, frameColor: '#ffffff' };
+export const DEFAULT_SHEET: Sheet = { widthMm: 504, heightMm: 506, gapMm: 5, radiusMm: 0, frameColor: '#ffffff', outerFrame: false };
 export const MAX_GAP_MM = 30;
 export const MAX_RADIUS_MM = 50;
 export const AUTO_HISTORY_LIMIT = 50;
@@ -171,6 +171,7 @@ export function docReducer(doc: Doc, action: DocAction): Doc {
       sheet.heightMm = clampSide(sheet.heightMm);
       sheet.gapMm = Math.min(MAX_GAP_MM, Math.max(0, sheet.gapMm || 0));
       sheet.radiusMm = Math.min(MAX_RADIUS_MM, Math.max(0, sheet.radiusMm || 0));
+      sheet.outerFrame = sheet.outerFrame === true;
       const same = (Object.keys(sheet) as (keyof Sheet)[]).every((k) => sheet[k] === doc.sheet[k]);
       return same ? doc : { ...doc, sheet };
     }

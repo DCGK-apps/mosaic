@@ -18,12 +18,25 @@ export interface Layout {
   dividers: DividerBox[];
 }
 
+/** What the layout needs to know about the sheet. */
+export type LayoutSheet = Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm' | 'outerFrame'>;
+
+/** The part of the sheet the photos fill: all of it, or inside a frame as wide as the gap around the edges. */
+export function sheetArea(sheet: LayoutSheet): Rect {
+  const w = Math.max(0, sheet.widthMm);
+  const h = Math.max(0, sheet.heightMm);
+  if (!sheet.outerFrame) return { x: 0, y: 0, w, h };
+  // A frame wider than the sheet would leave no room; a tenth of the shorter side always stays for the photos.
+  const m = Math.min(Math.max(0, sheet.gapMm), (Math.min(w, h) * 0.9) / 2);
+  return { x: m, y: m, w: w - 2 * m, h: h - 2 * m };
+}
+
 /**
  * Positions of all cells and dividers, in millimetres of the sheet.
  * The single source of truth for both the on-screen preview and the export,
  * so the saved file looks exactly like the screen.
  */
-export function computeLayout(tree: Node | null, sheet: Pick<Sheet, 'widthMm' | 'heightMm' | 'gapMm'>): Layout {
+export function computeLayout(tree: Node | null, sheet: LayoutSheet): Layout {
   const out: Layout = { cells: [], dividers: [] };
   if (!tree) return out;
   const gap = Math.max(0, sheet.gapMm);
@@ -48,7 +61,7 @@ export function computeLayout(tree: Node | null, sheet: Pick<Sheet, 'widthMm' | 
       walk(node.b, { x: r.x, y: r.y + first + g, w: r.w, h: second });
     }
   };
-  walk(tree, { x: 0, y: 0, w: Math.max(0, sheet.widthMm), h: Math.max(0, sheet.heightMm) });
+  walk(tree, sheetArea(sheet));
   return out;
 }
 

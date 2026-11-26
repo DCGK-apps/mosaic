@@ -51,6 +51,7 @@ function parseSheet(v: unknown): Sheet {
     heightMm: num(s.heightMm, DEFAULT_SHEET.heightMm),
     gapMm: num(s.gapMm, DEFAULT_SHEET.gapMm),
     radiusMm: num(s.radiusMm, DEFAULT_SHEET.radiusMm),
+    outerFrame: s.outerFrame === true,
     frameColor: typeof s.frameColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.frameColor) ? s.frameColor : DEFAULT_SHEET.frameColor,
   };
 }

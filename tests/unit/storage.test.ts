@@ -36,6 +36,12 @@ describe('restoreDoc', () => {
     expect(repaired.sheet.frameColor).toBe('#ffffff');
     expect(repaired.photos).toEqual([]);
     expect(repaired.autoIndex).toBe(0);
+    expect(repaired.sheet.outerFrame).toBe(false);
+  });
+
+  it('keeps the frame around the collage', () => {
+    const doc = docReducer(sample(), { type: 'setSheet', patch: { outerFrame: true } });
+    expect(restoreDoc(JSON.parse(JSON.stringify(toSaved(doc))), () => true)!.sheet.outerFrame).toBe(true);
   });
 });
 
