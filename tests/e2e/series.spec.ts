@@ -227,6 +227,24 @@ test.describe('computer', () => {
     expect(zip.includes(Buffer.from('lato_002.jpg'))).toBe(true);
   });
 
+  test('random order uses every photo once and is remembered', async ({ page }) => {
+    await page.getByTestId('auto-collage').click();
+    await page.getByTestId('auto-folder-input').setInputFiles(ASSETS);
+    await page.getByTestId('auto-order-random').click();
+    await expect(page.getByTestId('auto-order-random')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('auto-dialog')).toContainText('Zdjęcia zostaną wymieszane');
+    await page.getByTestId('auto-min').fill('2');
+    await page.getByTestId('auto-max').fill('3');
+    await page.getByTestId('auto-create').click();
+    await expect(items(page)).toHaveCount(2);
+    const names = (await getBatch(page)).flatMap((d) => d.photos.map((p: any) => p.name));
+    expect(names.toSorted()).toEqual(['landscape.jpg', 'portrait.jpg', 'square.jpg', 'tall.jpg', 'wide.jpg']);
+
+    await page.getByTestId('batch-hide').click();
+    await page.getByTestId('auto-collage').click();
+    await expect(page.getByTestId('auto-order-random')).toHaveAttribute('aria-checked', 'true');
+  });
+
   test('"Zrób N kolaży" splits the photos evenly into that many collages', async ({ page }) => {
     await page.getByTestId('auto-collage').click();
     await page.getByTestId('auto-folder-input').setInputFiles(ASSETS);

@@ -24,7 +24,7 @@ export interface BatchOptions {
   sheet: Sheet;
 }
 
-export type BatchOrder = 'date' | 'name';
+export type BatchOrder = 'date' | 'name' | 'random';
 
 /** What is known about a photo file before it is read. */
 export interface FileInfo {
@@ -50,11 +50,21 @@ const natural = new Intl.Collator('pl', { numeric: true, sensitivity: 'base' });
 /**
  * The order of photos in the series. By date: when the photo was taken (or,
  * without EXIF, when the file was last changed), then by name. By name: the way
- * file managers list them – "IMG_2" before "IMG_10".
+ * file managers list them – "IMG_2" before "IMG_10". Random: shuffled, the same
+ * way for the same seed (whatever order the browser lists the files in).
  */
-export function sortFiles<T extends FileInfo>(files: readonly T[], order: BatchOrder): T[] {
+export function sortFiles<T extends FileInfo>(files: readonly T[], order: BatchOrder, seed = 0): T[] {
   const byName = (a: T, b: T) => natural.compare(a.path, b.path);
   if (order === 'name') return files.toSorted(byName);
+  if (order === 'random') {
+    const out = files.toSorted(byName);
+    const rng = createRng(seed);
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [out[i], out[j]] = [out[j]!, out[i]!];
+    }
+    return out;
+  }
   return files.toSorted((a, b) => (a.taken ?? a.modified) - (b.taken ?? b.modified) || byName(a, b));
 }
 
@@ -242,6 +252,89 @@ async function planCount(
     b -= up;
   }
   return sizes.toReversed();
+}
+
+/** "Losowo": up to this many photos the app also picks which photos go together; above it the order stays fully random. */
+export const MAX_TUNED_PHOTOS = 100;
+
+/** Tries of the auto layout when scoring a group while tuning – close to the final layout's, so the scores can be trusted. */
+const TUNE_ATTEMPTS = 1000;
+const TUNE_TRIES_PER_PHOTO = 150;
+
+/** Photo proportions rounded so that photos from the same camera count as the same shape. */
+const shape = (p: Photo) => Math.round((p.width / Math.max(1, p.height)) * 100);
+
+const hash = (s: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+};
+
+/**
+ * For a random order: swaps photos between the collages (sizes stay) as long as
+ * the collages look better – cells closer to the photos' proportions, as in Auto.
+ * The score of a collage depends only on its photos' shapes, so it is cached by
+ * them and a swap of two photos of the same shape is skipped. Returns the photos
+ * in the new order (consecutive groups of `sizes`).
+ */
+export async function tuneGroups(
+  photos: readonly Photo[],
+  sizes: readonly number[],
+  opts: Omit<BatchOptions, 'min' | 'max' | 'count'>,
+  seed: number,
+  tick?: (done: number, total: number) => void | Promise<void>,
+): Promise<Photo[]> {
+  const groups: Photo[][] = [];
+  let start = 0;
+  for (const k of sizes) {
+    groups.push(photos.slice(start, start + k));
+    start += k;
+  }
+  const out = () => groups.flat();
+  if (groups.length < 2) return out();
+
+  const costs = new Map<string, number>();
+  const cost = (group: Photo[]): number => {
+    // Auto lays photos out by their proportions, the fixed modes in their order.
+    const shapes = group.map(shape);
+    if (opts.mode === 'auto') shapes.sort((a, b) => a - b);
+    const key = shapes.join(',');
+    let c = costs.get(key);
+    if (c === undefined) {
+      const rng = createRng(hash(key) ^ seed);
+      const tree = opts.mode === 'auto' ? autoLayout(group, opts.sheet, rng, TUNE_ATTEMPTS) : fixedLayout(opts.mode, group, rng);
+      c = layoutCost(tree, group, opts.sheet) * group.length;
+      costs.set(key, c);
+    }
+    return c;
+  };
+
+  const score = groups.map(cost);
+  const rng = createRng(seed ^ 0x5bd1e995);
+  const tries = TUNE_TRIES_PER_PHOTO * photos.length;
+  for (let t = 0; t < tries; t++) {
+    if (t % 200 === 0) await tick?.(t, tries);
+    const gi = Math.floor(rng() * groups.length);
+    let gj = Math.floor(rng() * (groups.length - 1));
+    if (gj >= gi) gj++;
+    const a = groups[gi]!;
+    const b = groups[gj]!;
+    const i = Math.floor(rng() * a.length);
+    const j = Math.floor(rng() * b.length);
+    if (shape(a[i]!) === shape(b[j]!)) continue;
+    const na = a.with(i, b[j]!);
+    const nb = b.with(j, a[i]!);
+    const ca = cost(na);
+    const cb = cost(nb);
+    if (ca + cb < score[gi]! + score[gj]! - 1e-9) {
+      groups[gi] = na;
+      groups[gj] = nb;
+      score[gi] = ca;
+      score[gj] = cb;
+    }
+  }
+  await tick?.(tries, tries);
+  return out();
 }
 
 /** The collages of the series: consecutive groups of `sizes` photos, each laid out and tagged with its key. */

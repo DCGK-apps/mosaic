@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchCopy, buildBatch, checkCount, clampCount, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, writeBack, type BatchOptions } from '../../src/core/batch';
+import { batchCopy, buildBatch, checkCount, clampCount, clampRange, collageCount, inChosenFolder, planBatch, seriesFileBase, sortFiles, tuneGroups, writeBack, type BatchOptions } from '../../src/core/batch';
 import { currentTree, DEFAULT_SHEET, docReducer } from '../../src/core/doc';
 import { leaves } from '../../src/core/tree';
 import { photo } from './helpers';
@@ -21,6 +21,15 @@ describe('sortFiles', () => {
 
   it('sorts by the EXIF date, or the file date when there is none', () => {
     expect(sortFiles(files, 'date').map((f) => f.path)).toEqual(['F/IMG_2.jpg', 'F/IMG_10.jpg', 'F/IMG_1.jpg']);
+  });
+
+  it('shuffles at random, the same way for the same seed whatever the input order', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ path: `F/IMG_${i}.jpg`, modified: i }));
+    const a = sortFiles(many, 'random', 7).map((f) => f.path);
+    expect(sortFiles(many.toReversed(), 'random', 7).map((f) => f.path)).toEqual(a);
+    expect(a.toSorted()).toEqual(many.map((f) => f.path).toSorted());
+    expect(a).not.toEqual(sortFiles(many, 'name').map((f) => f.path));
+    expect(sortFiles(many, 'random', 8).map((f) => f.path)).not.toEqual(a);
   });
 
   it('breaks date ties by name', () => {
@@ -160,6 +169,37 @@ describe('planBatch with a number of collages', () => {
     expect(await planBatch(photos(9), byCount(2, 'grid'), 3)).toEqual(a);
     expect(a.toSorted()).toEqual([4, 5]);
     expect(ticks.at(-1)).toBe(9);
+  });
+});
+
+describe('tuneGroups', () => {
+  const sheet = { ...DEFAULT_SHEET };
+  // Wide and tall photos taken in turns: a wide one and a tall one never fit one sheet well together.
+  const mixed = Array.from({ length: 8 }, (_, i) => (i % 2 ? photo(`t${i}`, 1000, 4000) : photo(`w${i}`, 4000, 1000)));
+
+  it('puts photos that fit together into the same collage, keeping every photo and the sizes', async () => {
+    const tuned = await tuneGroups(mixed, [2, 2, 2, 2], { mode: 'auto', sheet }, 1);
+    expect(tuned.map((p) => p.id).toSorted()).toEqual(mixed.map((p) => p.id).toSorted());
+    for (let g = 0; g < 4; g++) {
+      const kinds = new Set(tuned.slice(g * 2, g * 2 + 2).map((p) => p.id[0]));
+      expect(kinds.size).toBe(1);
+    }
+  });
+
+  it('is deterministic for a seed, reports progress and can be cancelled', async () => {
+    const ticks: number[] = [];
+    const a = await tuneGroups(mixed, [3, 5], { mode: 'auto', sheet }, 4, (done, total) => void ticks.push(done / total));
+    expect(await tuneGroups(mixed, [3, 5], { mode: 'auto', sheet }, 4)).toEqual(a);
+    expect(ticks.at(-1)).toBe(1);
+    await expect(
+      tuneGroups(mixed, [4, 4], { mode: 'auto', sheet }, 4, () => {
+        throw new Error('stop');
+      }),
+    ).rejects.toThrow('stop');
+  });
+
+  it('leaves a single collage as it is', async () => {
+    expect(await tuneGroups(mixed, [8], { mode: 'grid', sheet }, 1)).toEqual(mixed);
   });
 });
 
