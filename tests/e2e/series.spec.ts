@@ -220,6 +220,80 @@ test.describe('computer', () => {
     expect(zip.includes(Buffer.from('lato_002.jpg'))).toBe(true);
   });
 
+  test('"Zrób N kolaży" splits the photos evenly into that many collages', async ({ page }) => {
+    await page.getByTestId('auto-collage').click();
+    await page.getByTestId('auto-folder-input').setInputFiles(ASSETS);
+    await page.getByTestId('auto-split-count').click();
+    await page.getByTestId('auto-mode-grid').click();
+
+    // More collages than photos: the app says so and offers one per photo.
+    await page.getByTestId('auto-count').fill('8');
+    await expect(page.getByTestId('auto-count-problem')).toContainText('Zdjęć jest tylko 5');
+    await expect(page.getByTestId('auto-create')).toBeDisabled();
+    await page.getByTestId('auto-count-fix').click();
+    await expect(page.getByTestId('auto-count')).toHaveValue('5');
+    await expect(page.getByTestId('auto-count-problem')).toBeHidden();
+
+    await page.getByTestId('auto-count').fill('2');
+    await expect(page.getByTestId('auto-estimate')).toContainText('po 2–3 zdjęcia');
+    await page.getByTestId('auto-create').click();
+    await expect(page.getByTestId('auto-dialog')).toBeHidden();
+    await expect(items(page)).toHaveCount(2);
+    const sizes = (await getBatch(page)).map((d) => d.photos.length);
+    expect(sizes.toSorted()).toEqual([2, 3]);
+
+    // The choice is remembered.
+    await page.getByTestId('batch-hide').click();
+    await page.getByTestId('auto-collage').click();
+    await expect(page.getByTestId('auto-split-count')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('auto-count')).toHaveValue('2');
+  });
+
+  test('big collages need a confirmation, and more than 40 photos in one is not allowed', async ({ page }) => {
+    const root = join(test.info().outputPath('pick'), 'Duzo');
+    mkdirSync(root, { recursive: true });
+    const names = ['landscape', 'portrait', 'square', 'tall', 'wide'];
+    for (let i = 0; i < 41; i++) copyFileSync(asset(names[i % names.length]!), join(root, `IMG_${i}.jpg`));
+
+    const open = async () => {
+      await page.getByTestId('auto-collage').click();
+      await page.getByTestId('auto-folder-input').setInputFiles(root);
+      await expect(page.getByTestId('auto-folder-info')).toContainText('41 zdjęć');
+    };
+    await open();
+    await page.getByTestId('auto-split-count').click();
+    await page.getByTestId('auto-mode-grid').click();
+
+    // 41 in one collage: over the limit of 40.
+    await page.getByTestId('auto-count').fill('1');
+    await expect(page.getByTestId('auto-count-problem')).toContainText('najwyżej 40');
+    await expect(page.getByTestId('auto-create')).toBeDisabled();
+
+    // 20–21 per collage: allowed, but the app warns first.
+    await page.getByTestId('auto-count').fill('2');
+    await page.getByTestId('auto-create').click();
+    await expect(page.getByTestId('auto-large')).toContainText('po 20–21 zdjęć');
+    await page.getByTestId('auto-large-back').click();
+    await expect(page.getByTestId('auto-large')).toBeHidden();
+    await expect(page.getByTestId('auto-dialog')).toBeVisible();
+
+    await page.getByTestId('auto-create').click();
+    await expect(page.getByTestId('auto-large-suggest')).toHaveText(/Dobrze, zrób 3 kolaże/);
+    await page.getByTestId('auto-large-suggest').click();
+    await expect(page.getByTestId('auto-dialog')).toBeHidden();
+    await expect(items(page)).toHaveCount(3);
+
+    await page.getByTestId('batch-hide').click();
+    await open();
+    await expect(page.getByTestId('auto-count')).toHaveValue('3');
+    await page.getByTestId('auto-count').fill('2');
+    await page.getByTestId('auto-create').click();
+    await page.getByTestId('auto-large-anyway').click();
+    await expect(page.getByTestId('auto-dialog')).toBeHidden();
+    await expect(items(page)).toHaveCount(2);
+    expect((await getBatch(page)).map((d) => d.photos.length).toSorted()).toEqual([20, 21]);
+  });
+
   test('the series comes back after reloading the page, and can be closed', async ({ page }) => {
     await createSeries(page);
     await items(page).nth(1).click();

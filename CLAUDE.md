@@ -104,6 +104,7 @@ Na telefonie niewidoczna: `App` przekazuje `onAutoCollage` i renderuje `BatchPan
 - Otwarty projekt `.mosaic` traci `batchKey` (to samodzielny kolaż).
 - Autozapis trzyma zdjęcia z `doc` ∪ wszystkich kolaży serii; miniatury zdjęć (240 px) osobno w store `thumbs`.
 - `planBatch`: programowanie dynamiczne po kolejnych zdjęciach; koszt kolażu = `layoutCost` (te same kryteria co Auto) × liczba zdjęć + lekka kara za nierówne rozmiary + duża kara za wyjście poza zakres (tylko gdy zakresu nie da się spełnić). Dla 500 zdjęć i zakresu 2–20 trwa ~4 s, dlatego jest async z `tick` (postęp, przerwanie).
+- „Zrób N kolaży” (`split === 'count'`, `BatchOptions.count`): `planCount` daje dokładnie N kolaży po ⌊n/N⌋ lub ⌈n/N⌉ zdjęć, a DP wybiera, które dostają dodatkowe zdjęcie (`layoutCost`). `checkCount`: `fewPhotos` (zdjęć < N, propozycja n) i `tooLarge` (> `HARD_MAX_PER_COLLAGE` = 40) blokują „Utwórz”. `large` (> 20) pokazuje w stopce okna `auto-large`: „Dobrze, zrób ⌈n/20⌉” / „Wróć do ustawień” / „Wiem, zrób mimo to”.
 - `saveSeries` nie przerywa się na jednym kolażu: brak pamięci (`RenderError('memory')`) ponawia raz po 0,5 s, nieczytelne zdjęcie (`RenderError('photo')`) i błąd zapisu nie. Zwraca `{ saved, failed }`, a `SeriesSaveDialog` pokazuje raport z przyczynami i „Spróbuj ponownie” tylko dla nieudanych. Numer pliku = numer kolażu w panelu; puste kolaże są pomijane, a okno o tym informuje.
 - E2E: `tests/e2e/series.spec.ts` – folder wybiera `setInputFiles(ASSETS)`, `showDirectoryPicker` jest podmieniany w `addInitScript`; `__mosaic.batch()` zwraca serię.
 
@@ -130,7 +131,7 @@ Sposoby chwytania (`useEdgeDrag` w `SheetView`, nasłuch na `window`, bo przebud
 
 ### Preferencje w localStorage (`mosaic.prefs`)
 
-`dpi`, `exportType`, `installDismissed`, `lastProjectName`, `lastImageName`, `autoMin`, `autoMax`, `autoOrder`, `autoSubfolders`, `lastSeriesName`.
+`dpi`, `exportType`, `installDismissed`, `lastProjectName`, `lastImageName`, `autoMin`, `autoMax`, `autoSplit` ('size' | 'count'), `autoCount`, `autoOrder`, `autoSubfolders`, `lastSeriesName`.
 
 ## Testy
 
